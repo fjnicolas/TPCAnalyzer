@@ -1,0 +1,22 @@
+BEGIN_PROLOG
+analyzeIt:
+{
+  module_type:  "AnalyzeIt"
+
+  MCTruthLabel: "generator"
+  SimEnergyDepositLabel: "ionandscint"
+  SimEnergyDepositInstanceLabel: "priorSCE"
+  RecobWireLabel: "caldata"
+  RawDigitLabel: "daq"
+  HitLabel: "gaushit"
+
+  SaveTruth: true
+  SaveSimED: true
+  SaveWaveforms: false
+  SaveWires: false
+  SaveHits: true
+  CreateTPCMap: false
+  ApplyFiducialCut: true
+
+}
+END_PROLOG
