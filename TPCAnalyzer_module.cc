@@ -158,11 +158,13 @@ private:
   std::string fRawDigitLabel;
   std::string fRecobWireLabel;
   std::string fHitLabel;
+  std::string fSpacePointLabel;
   bool fSaveTruth;
   bool fSaveSimED;
   bool fSaveWaveforms;
   bool fSaveWires;
   bool fSaveHits;
+  bool fSaveSpacePoints;
   bool fCreateTPCMap;
   bool fApplyFiducialCut;
 
@@ -193,9 +195,12 @@ private:
   std::vector<double> fHitsPeakTime;
   std::vector<double> fHitsIntegral;
   std::vector<double> fHitsChannel;
-  std::vector<double> hitsX;
-  std::vector<double> hitsY;
-  std::vector<double> hitsZ;
+
+  //Space Point Variables
+  std::vector<double> fSpacePointX;
+  std::vector<double> fSpacePointY;
+  std::vector<double> fSpacePointZ;
+  std::vector<double> fSpacePointIntegral;
 
   //Waveforms
   std::vector<std::vector<double>> fRawChannelADC;
@@ -229,11 +234,13 @@ test::TPCAnalyzer::TPCAnalyzer(fhicl::ParameterSet const& p)
   fRawDigitLabel( p.get<std::string>("RawDigitLabel", "daq") ),
   fRecobWireLabel( p.get<std::string>("RecobWireLabel", "caldata") ),
   fHitLabel( p.get<std::string>("HitLabel", "gaushit") ),
+  fSpacePointLabel( p.get<std::string>("SpacePointLabel", "pandora") ),
   fSaveTruth( p.get<bool>("SaveTruth", "true") ),
   fSaveSimED( p.get<bool>("SaveSimED", "true") ),
   fSaveWaveforms( p.get<bool>("SaveWaveforms", "false") ),
   fSaveWires( p.get<bool>("SaveWires", "false") ),
   fSaveHits( p.get<bool>("SaveHits", "true") ),
+  fSaveSpacePoints( p.get<bool>("SaveSpacePoints", "false") ),
   fCreateTPCMap( p.get<bool>("CreateTPCMap", "false") ),
   fApplyFiducialCut( p.get<bool>("ApplyFiducialCut", "true") ),
   fNChannels(fGeom->Nchannels())
@@ -273,7 +280,6 @@ void test::TPCAnalyzer::analyze(art::Event const& e)
   fEventID = e.id().event();
   //Reset tree variables
   resetVars();
-
 
 
   //............................Read Truth Objects
@@ -398,40 +404,44 @@ void test::TPCAnalyzer::analyze(art::Event const& e)
 
 
   //............................Read Hits
-  if(fSaveHits){
+  if(fSaveHits || fSaveSpacePoints){
     art::Handle<std::vector<recob::Hit>> hitsHandle;
     std::vector<art::Ptr<recob::Hit>> hitsVect;
     std::cout<<" --- Saving recob::Hit\n";
     e.getByLabel(fHitLabel, hitsHandle);
     art::fill_ptr_vector(hitsVect, hitsHandle);
 
-    for (const art::Ptr<recob::Hit> &hit: hitsVect){
-      fHitsPeakTime.push_back(hit->PeakTime());
-      fHitsIntegral.push_back(hit->Integral());
-      fHitsChannel.push_back(hit->Channel());
-    }
-    /*art::Handle<std::vector<recob::SpacePoint>> eventSpacePoints;
-    std::vector<art::Ptr<recob::SpacePoint>> eventSpacePointsVect;
-    std::cout<<" --- Saving recob::Hit\n";
-
-    e.getByLabel("pandora", eventSpacePoints);
-    art::fill_ptr_vector(eventSpacePointsVect, eventSpacePoints);
-
-    art::FindManyP<recob::Hit> SPToHitAssoc (eventSpacePointsVect, e, "pandora");
-
-    for (const art::Ptr<recob::SpacePoint> &SP: eventSpacePointsVect){
-
-      std::vector<art::Ptr<recob::Hit>> SPHit = SPToHitAssoc.at(SP.key());
-
-      if (SPHit.at(0)->WireID().Plane==2){
-        hitsPTime.push_back(SPHit.at(0)->PeakTime());
-        hitsX.push_back(SP->position().X());
-        hitsY.push_back(SP->position().Y());
-        hitsZ.push_back(SP->position().Z());
-        hitsInteg.push_back(SPHit.at(0)->Integral());
+    if(fSaveHits){
+      for (const art::Ptr<recob::Hit> &hit: hitsVect){
+        fHitsPeakTime.push_back(hit->PeakTime());
+        fHitsIntegral.push_back(hit->Integral());
+        fHitsChannel.push_back(hit->Channel());
       }
+    }
 
-    }*/
+    if(fSaveSpacePoints){
+      art::Handle<std::vector<recob::SpacePoint>> eventSpacePoints;
+      std::vector<art::Ptr<recob::SpacePoint>> eventSpacePointsVect;
+      std::cout<<" --- Saving recob::SpacePoints\n";
+
+      e.getByLabel(fSpacePointLabel, eventSpacePoints);
+      art::fill_ptr_vector(eventSpacePointsVect, eventSpacePoints);
+
+      art::FindManyP<recob::Hit> SPToHitAssoc (eventSpacePointsVect, e, fSpacePointLabel);
+
+      for (const art::Ptr<recob::SpacePoint> &SP: eventSpacePointsVect){
+
+        std::vector<art::Ptr<recob::Hit>> SPHit = SPToHitAssoc.at(SP.key());
+
+        if (SPHit.at(0)->WireID().Plane==2){
+          fSpacePointX.push_back(SP->position().X());
+          fSpacePointY.push_back(SP->position().Y());
+          fSpacePointZ.push_back(SP->position().Z());
+          fSpacePointIntegral.push_back(SPHit.at(0)->Integral());
+        }
+
+      }
+    }
   }
 
 
@@ -489,9 +499,13 @@ void test::TPCAnalyzer::resetVars()
     fHitsIntegral.clear();
     fHitsPeakTime.clear();
     fHitsChannel.clear();
-    hitsX.clear();
-    hitsY.clear();
-    hitsZ.clear();
+  }
+
+  if(fSaveSpacePoints){
+    fSpacePointX.clear();
+    fSpacePointY.clear();
+    fSpacePointZ.clear();
+    fSpacePointIntegral.clear();
   }
 
 }
@@ -555,9 +569,13 @@ void test::TPCAnalyzer::beginJob()
     fTree->Branch("HitsIntegral", &fHitsIntegral);
     fTree->Branch("HitsPeakTime", &fHitsPeakTime);
     fTree->Branch("HitsChannel", &fHitsChannel);
-    //fTree->Branch("hitsX", &hitsX);
-    //fTree->Branch("hitsY", &hitsY);
-    //fTree->Branch("hitsZ", &hitsZ);
+  }
+
+  if(fSaveSpacePoints){
+    fTree->Branch("SpacePointX", &fSpacePointX);
+    fTree->Branch("SpacePointY", &fSpacePointY);
+    fTree->Branch("SpacePointZ", &fSpacePointZ);
+    fTree->Branch("SpacePointIntegral", &fSpacePointIntegral);
   }
 
   fNAnalyzedEvents=0;

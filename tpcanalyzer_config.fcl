@@ -9,12 +9,14 @@ tpcana:
   RecobWireLabel: "caldata"
   RawDigitLabel: "daq"
   HitLabel: "gaushit"
+  SpacePointLabel: "pandora"
 
   SaveTruth: true
   SaveSimED: true
   SaveWaveforms: false
   SaveWires: false
   SaveHits: true
+  SaveSpacePoints: false
   CreateTPCMap: false
   ApplyFiducialCut: true
 
