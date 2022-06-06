@@ -1,4 +1,4 @@
-#include "analyzeIt_config.fcl"
+#include "tpcanalyzer_config.fcl"
 #include "simulationservices_sbnd.fcl"
 #include "hitfindermodules_sbnd.fcl"
 #include "signalservices_sbnd.fcl"
@@ -24,7 +24,7 @@ physics:
 {
 	analyzers:
 	{
-		ana: @local::analyzeIt
+		ana: @local::tpcana
 	}
 	path0: [ana]
 	end_paths: [path0]
