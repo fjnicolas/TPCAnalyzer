@@ -117,8 +117,8 @@
 
 #define fXFidCut 200
 #define fYFidCut 200
-#define fZFidCut1 0
-#define fZFidCut2 500
+#define fZFidCut1 5
+#define fZFidCut2 495
 
 namespace test {
   class TPCAnalyzer
