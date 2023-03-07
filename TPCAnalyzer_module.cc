@@ -42,7 +42,8 @@ test::TPCAnalyzer::TPCAnalyzer(fhicl::ParameterSet const& p)
   fTickPeriodTPC = clockData.TPCClock().TickPeriod(); //in us
   fReadoutWindow = detProp.ReadOutWindowSize();
   fDriftVelocity = detProp.DriftVelocity(); //in cm/us
-  fWirePlanePosition = std::abs( fGeom->Plane(1).GetCenter()[0] );
+  constexpr geo::TPCID tpcid{0, 0};
+  fWirePlanePosition = std::abs( fGeom->Plane(geo::PlaneID{tpcid, 1}).GetCenter().X() );
 
 
   std::cout<<"  - Read TPC clocks...  ReadOutWindowSize: "<<fReadoutWindow<<"  TriggerOffsetTPC: "<<fTriggerOffsetTPC;
@@ -105,15 +106,19 @@ void test::TPCAnalyzer::analyze(art::Event const& e)
           }
           
           if(fApplyFiducialCut && std::abs(fTrueVx)<fXFidCut && std::abs(fTrueVy)<fYFidCut && fTrueVz>fZFidCut1 && fTrueVz<fZFidCut2){
-            const double p[3]={fTrueVx, fTrueVy, fTrueVz};
-            std::cout<<"HasTPC: "<<fGeom->HasTPC(fGeom->FindTPCAtPosition(p))<<" "<<fGeom->FindTPCAtPosition(p).TPC<<std::endl;
+            geo::Point_t po ={fTrueVx, fTrueVy, fTrueVz};
+
+            std::cout<<"HasTPC: "<<fGeom->HasTPC(fGeom->FindTPCAtPosition(po))<<" "<<fGeom->FindTPCAtPosition(po).TPC<<std::endl;
 
 
-            if( fGeom->HasTPC(fGeom->FindTPCAtPosition(p)) ){
-              unsigned int tpcID=fGeom->FindTPCAtPosition(p).TPC;
-              fTrueVU=fGeom->NearestChannel(p, 0, tpcID, 0);
-              fTrueVV=fGeom->NearestChannel(p, 1, tpcID, 0);
-              fTrueVC=fGeom->NearestChannel(p, 2, tpcID, 0);
+            if( fGeom->HasTPC(fGeom->FindTPCAtPosition(po)) ){
+              
+              unsigned int tpcID=fGeom->FindTPCAtPosition(po).TPC;
+              geo::PlaneID plane(0, tpcID, 0);
+              //fTrueVU=fGeom->NearestChannel(po, 0, tpcID, 0);
+              fTrueVU=fGeom->NearestChannel(po, geo::PlaneID(0, tpcID, 0));
+              fTrueVV=fGeom->NearestChannel(po, geo::PlaneID(0, tpcID, 1));
+              fTrueVC=fGeom->NearestChannel(po, geo::PlaneID(0, tpcID, 2));
               fTrueVTimeTick=VertexToDriftTick(fTrueVt, fTrueVx);
             }
           }
@@ -298,17 +303,20 @@ void test::TPCAnalyzer::analyze(art::Event const& e)
           fRecoVx= xyz_vertex[0];
           fRecoVy= xyz_vertex[1];
           fRecoVz= xyz_vertex[2];
+          
 
           if(fApplyFiducialCut && std::abs(fRecoVx)<fXFidCut && std::abs(fRecoVy)<fYFidCut && fRecoVz>fZFidCut1 && fRecoVz<fZFidCut2){
             //const double p[3]={fVx, fTrueVy, fTrueVz};
-            std::cout<<"HasTPC: "<<fGeom->HasTPC(fGeom->FindTPCAtPosition(xyz_vertex))<<" "
-              <<fGeom->FindTPCAtPosition(xyz_vertex).TPC<<std::endl;
+            geo::Point_t xyz_vertexP{fRecoVx, fRecoVy, fRecoVz};
+            std::cout<<"HasTPC: "<<fGeom->HasTPC(fGeom->FindTPCAtPosition(xyz_vertexP))<<" "
+              <<fGeom->FindTPCAtPosition(xyz_vertexP).TPC<<std::endl;
 
-            if( fGeom->HasTPC(fGeom->FindTPCAtPosition(xyz_vertex)) ){
-              unsigned int tpcID=fGeom->FindTPCAtPosition(xyz_vertex).TPC;
-              fRecoVU=fGeom->NearestChannel(xyz_vertex, 0, tpcID, 0);
-              fRecoVV=fGeom->NearestChannel(xyz_vertex, 1, tpcID, 0);
-              fRecoVC=fGeom->NearestChannel(xyz_vertex, 2, tpcID, 0);
+            if( fGeom->HasTPC(fGeom->FindTPCAtPosition(xyz_vertexP)) ){
+              unsigned int tpcID=fGeom->FindTPCAtPosition(xyz_vertexP).TPC;
+              
+              fRecoVU=fGeom->NearestChannel(xyz_vertexP, geo::PlaneID(0, tpcID, 0) );
+              fRecoVV=fGeom->NearestChannel(xyz_vertexP, geo::PlaneID(0, tpcID, 1) );
+              fRecoVC=fGeom->NearestChannel(xyz_vertexP, geo::PlaneID(0, tpcID, 2) );
               fRecoVTimeTick=VertexToDriftTick(fTrueVt, fRecoVx);
             }
           }
