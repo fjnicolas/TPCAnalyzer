@@ -1,7 +1,8 @@
-#include "chargeAnalyzer_config.fcl"
+#include "tpcanalyzer_config.fcl"
 #include "simulationservices_sbnd.fcl"
 #include "hitfindermodules_sbnd.fcl"
 #include "signalservices_sbnd.fcl"
+#include "hypana_config.fcl"
 
 process_name: Ana
 
@@ -24,8 +25,16 @@ physics:
 {
 	analyzers:
 	{
-		ana: @local::chargeAnalyzer
+		ana: @local::tpcana
+		hypanatree:@local::hypAna
 	}
-	path0: [ana]
+	path0: [ana, hypanatree]
 	end_paths: [path0]
 }
+
+physics.analyzers.hypanatree.SaveMCParticles: true
+physics.analyzers.hypanatree.SaveMCTrajectories: true
+physics.analyzers.hypanatree.DebugModeMC: true
+physics.analyzers.ana.SaveWires: false
+physics.analyzers.ana.SaveSpacePoints: false
+physics.analyzers.ana.SaveVertex: true

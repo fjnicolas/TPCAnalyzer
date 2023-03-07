@@ -1,7 +1,7 @@
 BEGIN_PROLOG
-tpcana:
+tpcrecoana:
 {
-  module_type:  "TPCAnalyzer"
+  module_type:  "TPCRecoAnalyzer"
 
   MCTruthLabel: "generator"
   SimEnergyDepositLabel: "ionandscint"
@@ -11,17 +11,9 @@ tpcana:
   HitLabel: "gaushit"
   SpacePointLabel: "pandora"
   VertexLabel: "pandora"
-
-  SaveTruth: true
-  SaveSimED: true
-  SaveWaveforms: false
-  SaveWires: false
-  SaveHits: true
-  SaveSpacePoints: false
-  SaveVertex: true
-  CreateTPCMap: false
+  SliceLabel: "pandora"
+  TrackLabel: "pandoraTrack"
   ApplyFiducialCut: true
-  ApplyVertexSCE: true
-
+  MinHitsSlice: 25
 }
 END_PROLOG

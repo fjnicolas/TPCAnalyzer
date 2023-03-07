@@ -23,6 +23,7 @@ ${ART_FRAMEWORK_SERVICES_REGISTRY}
  larcorealg_Geometry
  sbndcode_RecoUtils
  larreco_SpacePointSolver
+
  )
  install_source()
  install_fhicl()
