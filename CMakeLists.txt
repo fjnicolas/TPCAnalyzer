@@ -20,7 +20,8 @@ set(
  larcorealg::Geometry
  larcore::Geometry_Geometry_service
  larevt::SpaceCharge
- lardata::DetectorPropertiesService
+ lardata::DetectorInfoServices_DetectorClocksServiceStandard_service
+
  )
 
 cet_build_plugin(TPCAnalyzer art::Module SOURCE TPCAnalyzer_module.cc LIBRARIES ${MODULE_LIBRARIES} )
