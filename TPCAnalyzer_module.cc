@@ -16,6 +16,8 @@ test::TPCAnalyzer::TPCAnalyzer(fhicl::ParameterSet const& p)
   fMCTruthLabel( p.get<std::string>("MCTruthLabel", "generator") ),
   fSimEnergyDepositLabel( p.get<std::string>("SimEnergyDepositLabel", "ionandscint") ),
   fSimEnergyDepositInstanceLabel( p.get<std::string>("SimEnergyDepositInstanceLabel", "priorSCE") ),
+  fSimEnergyDepositLabelOut( p.get<std::string>("SimEnergyDepositLabelOut", "ionandscintout") ),
+  fSimEnergyDepositInstanceLabelOut( p.get<std::string>("SimEnergyDepositInstanceLabelOut", "") ),
   fRawDigitLabel( p.get<std::string>("RawDigitLabel", "daq") ),
   fRecobWireLabel( p.get<std::string>("RecobWireLabel", "caldata") ),
   fHitLabel( p.get<std::string>("HitLabel", "gaushit") ),
@@ -23,6 +25,7 @@ test::TPCAnalyzer::TPCAnalyzer(fhicl::ParameterSet const& p)
   fVertexLabel( p.get<std::string>("VertexLabel", "pandora") ),
   fSaveTruth( p.get<bool>("SaveTruth", "true") ),
   fSaveSimED( p.get<bool>("SaveSimED", "true") ),
+  fSaveSimEDOut( p.get<bool>("SaveSimED", "false") ),
   fSaveWaveforms( p.get<bool>("SaveWaveforms", "false") ),
   fSaveWires( p.get<bool>("SaveWires", "false") ),
   fSaveHits( p.get<bool>("SaveHits", "true") ),
@@ -151,6 +154,24 @@ void test::TPCAnalyzer::analyze(art::Event const& e)
       fEnDepY.push_back(SimED.MidPointY());
       fEnDepZ.push_back(SimED.MidPointZ());
       fEnDepT.push_back( (SimED.StartT()+SimED.EndT())/2. );
+    }
+  }
+
+
+  //............................Read SimEnergyDeposits out volume
+  if(fSaveSimEDOut){
+    art::Handle<std::vector<sim::SimEnergyDeposit> > SimEDHandle;
+    e.getByLabel(fSimEnergyDepositLabelOut, fSimEnergyDepositInstanceLabelOut, SimEDHandle);
+    std::cout<<"  ---- Reading SimEnergyDeposition from handle: "<<SimEDHandle.provenance()->moduleLabel();
+    std::cout<<":"<<SimEDHandle.provenance()->productInstanceName()<<" ----\n";
+
+
+    for (auto const& SimED : *SimEDHandle){
+      fEnDepEOut.push_back(SimED.Energy());
+      fEnDepXOut.push_back(SimED.MidPointX());
+      fEnDepYOut.push_back(SimED.MidPointY());
+      fEnDepZOut.push_back(SimED.MidPointZ());
+      fEnDepTOut.push_back( (SimED.StartT()+SimED.EndT())/2. );
     }
   }
 

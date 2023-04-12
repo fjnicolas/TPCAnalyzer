@@ -6,6 +6,8 @@ tpcana:
   MCTruthLabel: "generator"
   SimEnergyDepositLabel: "ionandscint"
   SimEnergyDepositInstanceLabel: "priorSCE"
+  SimEnergyDepositLabelOut: "ionandscintout"
+  SimEnergyDepositInstanceLabelOut: ""
   RecobWireLabel: "caldata"
   RawDigitLabel: "daq"
   HitLabel: "gaushit"
@@ -14,6 +16,7 @@ tpcana:
 
   SaveTruth: true
   SaveSimED: true
+  SaveSimEDOut: false
   SaveWaveforms: false
   SaveWires: false
   SaveHits: true

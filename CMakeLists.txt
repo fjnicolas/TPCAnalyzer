@@ -31,3 +31,4 @@ install_fhicl()
 FILE(GLOB fcl_files *.fcl)
 
 add_subdirectory(job)
+add_subdirectory(EventIDFilter)

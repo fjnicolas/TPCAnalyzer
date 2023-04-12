@@ -107,6 +107,8 @@ private:
   std::string fMCTruthLabel;
   std::string fSimEnergyDepositLabel;
   std::string fSimEnergyDepositInstanceLabel;
+  std::string fSimEnergyDepositLabelOut;
+  std::string fSimEnergyDepositInstanceLabelOut;
   std::string fRawDigitLabel;
   std::string fRecobWireLabel;
   std::string fHitLabel;
@@ -114,6 +116,7 @@ private:
   std::string fVertexLabel;
   bool fSaveTruth;
   bool fSaveSimED;
+  bool fSaveSimEDOut;
   bool fSaveWaveforms;
   bool fSaveWires;
   bool fSaveHits;
@@ -145,6 +148,13 @@ private:
   std::vector<double> fEnDepY;
   std::vector<double> fEnDepZ;
   std::vector<double> fEnDepT;
+
+  //True SimEnergyDeposits Out
+  std::vector<double> fEnDepEOut;
+  std::vector<double> fEnDepXOut;
+  std::vector<double> fEnDepYOut;
+  std::vector<double> fEnDepZOut;
+  std::vector<double> fEnDepTOut;
 
   //Hit variables
   std::vector<double> fHitsPeakTime;
@@ -225,6 +235,14 @@ void test::TPCAnalyzer::beginJob()
     fTree->Branch("EnDepY", &fEnDepY);
     fTree->Branch("EnDepZ", &fEnDepZ);
     fTree->Branch("EnDepT", &fEnDepT);
+  }
+
+  if(fSaveSimEDOut){
+    fTree->Branch("EnDepEOut", &fEnDepEOut);
+    fTree->Branch("EnDepXOut", &fEnDepXOut);
+    fTree->Branch("EnDepYOut", &fEnDepYOut);
+    fTree->Branch("EnDepZOut", &fEnDepZOut);
+    fTree->Branch("EnDepTOut", &fEnDepTOut);
   }
 
   if(fSaveWaveforms){
