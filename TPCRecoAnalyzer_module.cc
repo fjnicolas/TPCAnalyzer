@@ -68,17 +68,6 @@
 #include "lardataobj/AnalysisBase/ParticleID.h"
 #include "lardataobj/RawData/RawDigit.h"
 #include "lardataobj/RecoBase/Wire.h"
-#include "lardataobj/RawData/BeamInfo.h"
-#include "lardataobj/RawData/OpDetWaveform.h"
-#include "lardataobj/Simulation/SimPhotons.h"
-#include "lardataobj/RecoBase/MCSFitResult.h"
-
-#include "larreco/RecoAlg/TrackMomentumCalculator.h"
-#include "larreco/RecoAlg/TrajectoryMCSFitter.h"
-#include "larreco/RecoAlg/PMAlg/PmaTrack3D.h"
-#include "larreco/SpacePointSolver/TripletFinder.h"
-
-#include "larpandora/LArPandoraInterface/LArPandoraHelper.h"
 
 #include "larsim/MCCheater/BackTracker.h"
 #include "larsim/MCCheater/BackTrackerService.h"
@@ -122,6 +111,11 @@
 #define fZFidCut2 495
 
 #define fDefaulNeutrinoID 99999
+
+//#include "canvas/Persistency/Provenance/FileMetaData.h"
+#include "art/Framework/Services/System/FileCatalogMetadata.h"
+//#include "art/Framework/Services/Optional/FileCatalogMetadataPlugin.h"
+
 
 namespace test {
   class TPCAnalyzer
@@ -204,6 +198,7 @@ private:
   std::vector<double> fHitsPeakTime;
   std::vector<double> fHitsIntegral;
   std::vector<double> fHitsChannel;
+    std::vector<int> fHitsCluster;
 
   //Hit variables from track
   std::vector<double> fTrkHitsPeakTime;
@@ -300,9 +295,25 @@ test::TPCAnalyzer::TPCAnalyzer(fhicl::ParameterSet const& p)
 void test::TPCAnalyzer::analyze(art::Event const& e)
 {
   // Implementation of required member function here.
-  std::cout<<"Running TPCAnalyzer---run="<< e.id().run()<<" --subrun="<< e.id().subRun()<<" --event="<<e.id().event()<<"\n";
+  std::cout<<"Running TPCRecoAnalyzer---run="<< e.id().run()<<" --subrun="<< e.id().subRun()<<" --event="<<e.id().event()<<"\n";
   //auto const fClockData = art::ServiceHandle<detinfo::DetectorClocksService const>()->DataFor(e);
   //auto const fDetProp = art::ServiceHandle<detinfo::DetectorPropertiesService const>()->DataFor(e, fClockData);
+
+
+  // Get file metadata
+  /************************************************************************************************/
+  //  art::ServiceHandle<art::FileCatalogMetadata> metadata;
+  //std::string inputFile = metadata->FileCatalogMetadata().get<std::string>("input_file_name");
+  //std::cout << "Input file name: " << inputFile << std::endl;
+  std::cout<<" READING METADATA\n";
+  art::FileCatalogMetadata::collection_type artmd;
+  art::ServiceHandle<art::FileCatalogMetadata> metadata;
+  metadata->getMetadata(artmd);
+  //const auto& fileMeta = metadata->getMetadata(artmd);
+  //auto runIter = fileMeta.find("run_number");
+  //std::cout<<runIter<<std::endl;
+  for(const auto& d: artmd)
+    std::cout<<d.first<<" "<<d.second<<std::endl;
 
   ::art::Handle<std::vector<recob::Hit>> hitHandle;
   e.getByLabel("gaushit", hitHandle);
@@ -319,7 +330,9 @@ void test::TPCAnalyzer::analyze(art::Event const& e)
   e.getByLabel(fSliceLabel, pfpHandle);
   //............................Read Recob Tracks
   ::art::Handle<std::vector<recob::Track>> trackHandle;
-  e.getByLabel(fTrackLabel, trackHandle);
+  e.getByLabel(fSliceLabel, trackHandle);
+  ::art::Handle<std::vector<recob::Cluster>> clusterHandle;
+  e.getByLabel("pandora", clusterHandle);
   //Vector for recob hits
   std::vector<art::Ptr<recob::Hit>> hitVect;
   //Vector for recob PFParticles
@@ -328,6 +341,8 @@ void test::TPCAnalyzer::analyze(art::Event const& e)
   art::FindManyP<recob::Hit> slice_hit_assns (sliceHandle, e, fSliceLabel);
   //Slice association for PFParticles
   art::FindManyP<recob::PFParticle> slice_pfp_assns (sliceHandle, e, fSliceLabel);
+  art::FindManyP<recob::Cluster> pfp_cluster_assns (pfpHandle, e, "pandora");
+  art::FindManyP<recob::Hit> cluster_hit_assns (clusterHandle, e, "pandora");
   // Loop over slices
   std::vector< art::Ptr<recob::Slice> > sliceVect;
   art::fill_ptr_vector(sliceVect, sliceHandle);
@@ -424,17 +439,6 @@ void test::TPCAnalyzer::analyze(art::Event const& e)
     }
 
 
-    //............................Read Recob Hits
-    if(fSaveHits){
-      std::cout<<"    --- Saving recob::Hit\n";
-      for (const art::Ptr<recob::Hit> &hit: hitVect){
-        fHitsPeakTime.push_back(hit->PeakTime());
-        fHitsIntegral.push_back(hit->Integral());
-        fHitsChannel.push_back(hit->Channel());
-      }
-    }
-
-
     //----- get the space points
     if(fSaveSpacePoints){
       art::Handle<std::vector<recob::SpacePoint>> eventSpacePoints;
@@ -485,7 +489,6 @@ void test::TPCAnalyzer::analyze(art::Event const& e)
           //Get PFParticle Vertex
           std::vector< art::Ptr<recob::Vertex> > vertexVec = vertexAssoc.at(pfp.key());
 
-          //PFParticle's vertex loop
           std::cout<<"     PFParticle: "<<pfp->Self()<<std::endl;
           for(const art::Ptr<recob::Vertex> &ver : vertexVec){
             double xyz_vertex[3];
@@ -527,6 +530,19 @@ void test::TPCAnalyzer::analyze(art::Event const& e)
               fRecoVTimeTick=-1;
             }
           }
+
+          //Read cluster and store hits
+          std::vector<art::Ptr<recob::Cluster>> cluster_v = pfp_cluster_assns.at(pfp.key());
+          for(size_t i=0; i<cluster_v.size(); i++){
+            std::vector<art::Ptr<recob::Hit>> hitVect = cluster_hit_assns.at(cluster_v[i].key());
+            for (const art::Ptr<recob::Hit> &hit: hitVect){
+              fHitsPeakTime.push_back(hit->PeakTime());
+              fHitsIntegral.push_back(hit->Integral());
+              fHitsChannel.push_back(hit->Channel());
+              fHitsCluster.push_back(cluster_v[i].key());
+            }
+          }
+
         }
       }
 
@@ -640,6 +656,7 @@ void test::TPCAnalyzer::resetVars()
     fHitsIntegral.clear();
     fHitsPeakTime.clear();
     fHitsChannel.clear();
+    fHitsCluster.clear();
     fnSlices = 0;
   }
 
@@ -726,6 +743,7 @@ void test::TPCAnalyzer::beginJob()
     fTree->Branch("HitsIntegral", &fHitsIntegral);
     fTree->Branch("HitsPeakTime", &fHitsPeakTime);
     fTree->Branch("HitsChannel", &fHitsChannel);
+    fTree->Branch("HitsCluster", &fHitsCluster);
     fTree->Branch("nSlices", &fnSlices, "nSlices/I");
   }
 

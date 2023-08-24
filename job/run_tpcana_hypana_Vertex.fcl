@@ -18,7 +18,7 @@ TFileService: { fileName: "analyzeItOutput_R%r-%R_SR%s-%S.root"}
 @table::sbnd_services
 BackTrackerService: @local::standard_backtrackerservice
 ParticleInventoryService: @local::standard_particleinventoryservice
-#SpaceCharge:               @local::sbnd_spacecharge
+SpaceCharge:               @local::sbnd_spacecharge
 }
 
 physics:
@@ -38,3 +38,6 @@ physics.analyzers.hypanatree.DebugModeMC: true
 physics.analyzers.ana.SaveWires: false
 physics.analyzers.ana.SaveSpacePoints: false
 physics.analyzers.ana.SaveVertex: true
+
+
+#include "enable_spacecharge_services_sbnd.fcl"

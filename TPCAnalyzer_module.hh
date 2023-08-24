@@ -51,6 +51,7 @@
 #include "lardataobj/RawData/RawDigit.h"
 #include "lardataobj/RecoBase/Wire.h"
 #include "lardataobj/RecoBase/Vertex.h"
+#include "lardataobj/RecoBase/Slice.h"
 
 
 #include "TTree.h"
@@ -60,6 +61,7 @@
 
 #include <vector>
 #include <limits>
+#include <cmath>
 #include <map>
 #include <sstream>
 #include <fstream>
@@ -112,8 +114,11 @@ private:
   std::string fRawDigitLabel;
   std::string fRecobWireLabel;
   std::string fHitLabel;
+  std::string fReco2Label;
+  std::string fTrackLabel;
   std::string fSpacePointLabel;
   std::string fVertexLabel;
+  bool fSaveReco2;
   bool fSaveTruth;
   bool fSaveSimED;
   bool fSaveSimEDOut;
@@ -147,6 +152,9 @@ private:
   std::vector<double> fEnDepX;
   std::vector<double> fEnDepY;
   std::vector<double> fEnDepZ;
+  std::vector<double> fEnDepU;
+  std::vector<double> fEnDepV;
+  std::vector<double> fEnDepC;
   std::vector<double> fEnDepT;
 
   //True SimEnergyDeposits Out
@@ -160,8 +168,16 @@ private:
   std::vector<double> fHitsPeakTime;
   std::vector<double> fHitsIntegral;
   std::vector<double> fHitsChannel;
+  std::vector<double> fHitsRMS;
+  std::vector<double> fHitsStartT;
+  std::vector<double> fHitsEndT;
+  std::vector<double> fHitsWidth;
   std::vector<double> fHitsChi2;
   std::vector<double> fHitsNDF;
+  std::vector<int> fHitsClusterID;
+
+  // Slice variables
+  int fNSlices;
 
   //Space Point Variables
   std::vector<double> fSpacePointX;
@@ -189,6 +205,10 @@ private:
   int fRecoVC;
   int fRecoVTimeTick;
 
+  // Reco track start/end points
+  std::vector<std::vector<double>> fPFTrackStart;
+  std::vector<std::vector<double>> fPFTrackEnd;
+
   int fNAnalyzedEvents;
 
   const geo::GeometryCore* fGeom = art::ServiceHandle<geo::Geometry>()->provider();
@@ -199,6 +219,11 @@ private:
   double fTickPeriodTPC;
   double fDriftVelocity;
   double fWirePlanePosition;
+  // Wire orientation
+  double fCos60;
+  double fSin60;
+  double fWirePitch;
+
 };
 
 
@@ -234,6 +259,9 @@ void test::TPCAnalyzer::beginJob()
     fTree->Branch("EnDepX", &fEnDepX);
     fTree->Branch("EnDepY", &fEnDepY);
     fTree->Branch("EnDepZ", &fEnDepZ);
+    fTree->Branch("EnDepU", &fEnDepU);
+    fTree->Branch("EnDepV", &fEnDepV);
+    fTree->Branch("EnDepC", &fEnDepC);
     fTree->Branch("EnDepT", &fEnDepT);
   }
 
@@ -270,8 +298,13 @@ void test::TPCAnalyzer::beginJob()
     fTree->Branch("HitsIntegral", &fHitsIntegral);
     fTree->Branch("HitsPeakTime", &fHitsPeakTime);
     fTree->Branch("HitsChannel", &fHitsChannel);
+    fTree->Branch("HitsRMS", &fHitsRMS);
+    fTree->Branch("HitsStartT", &fHitsStartT);
+    fTree->Branch("HitsEndT", &fHitsEndT);
+    fTree->Branch("HitsWidth", &fHitsWidth);
     fTree->Branch("HitsChi2", &fHitsChi2);
     fTree->Branch("HitsNDF", &fHitsNDF);
+    fTree->Branch("HitsClusterID", &fHitsClusterID);
   }
 
   if(fSaveSpacePoints){
@@ -291,6 +324,10 @@ void test::TPCAnalyzer::beginJob()
     fTree->Branch("RecoVTimeTick", &fRecoVTimeTick, "RecoVC/I");
   }
 
+  if(fSaveReco2){
+    fTree->Branch("PFTrackStart", &fPFTrackStart);
+    fTree->Branch("PFTrackEnd", &fPFTrackEnd);
+  }
   fNAnalyzedEvents=0;
 }
 

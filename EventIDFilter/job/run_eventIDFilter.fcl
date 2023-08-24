@@ -17,7 +17,7 @@ outputs:
   out1:
   {
     module_type: RootOutput
-    fileName:    "filtered_events.root"
+    fileName:    "caf_filtered_events.root"
     dataTier:    "reconstructed"
     compressionLevel: 1
 	SelectEvents: [ "myfilter" ]

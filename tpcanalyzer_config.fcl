@@ -13,7 +13,10 @@ tpcana:
   HitLabel: "gaushit"
   SpacePointLabel: "pandora"
   VertexLabel: "pandora"
+  Reco2Label: "pandora"
+  TrackLabel: "pandoraTrack"
 
+  SaveReco2: false
   SaveTruth: true
   SaveSimED: true
   SaveSimEDOut: false
