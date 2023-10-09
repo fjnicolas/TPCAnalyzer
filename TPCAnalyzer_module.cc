@@ -316,21 +316,29 @@ void test::TPCAnalyzer::analyze(art::Event const& e)
     
     for(auto & slice:sliceVect){
 
+        resetRecoVars();
+
         pfpVect = slice_pfp_assns.at(slice.key());
 
+        size_t slice_ix = std::distance(sliceVect.begin(), std::find(sliceVect.begin(), sliceVect.end(), slice));
+        std::cout<<"\n-----Slice index = "<<slice_ix<< " NPFPs="<<pfpVect.size()<<std::endl;
+
         //PFParticle loop -- GetPrimary
+        bool isNeutrino = false;
         for(const art::Ptr<recob::PFParticle> &pfp : pfpVect){
 
-          std::cout<<"     PFParticle: "<<pfp->Self()<<"      PDG:"<<pfp->PdgCode()<<"  Primary="<<pfp->IsPrimary()<<std::endl;
+          std::cout<<"   ** PFParticle: "<<pfp->Self()<<"      PDG:"<<pfp->PdgCode()<<"  Primary="<<pfp->IsPrimary()<<std::endl;
 
           // Save reconstructed neutrino vertex
           if(  pfp->IsPrimary() && ( std::abs(pfp->PdgCode())==12 || std::abs(pfp->PdgCode())==14 ) ){
+            std::cout<<"    This is a reconstructed netrino!\n";
+            isNeutrino=true;
             //Get PFParticle Vertex
             std::vector< art::Ptr<recob::Vertex> > vertexVec = pfp_vertex_assns.at(pfp.key());
             for(const art::Ptr<recob::Vertex> &ver : vertexVec){
               geo::Point_t xyz_vertex = ver->position();
               double chi2=ver->chi2(), chi2ndof=ver->chi2PerNdof();
-              std::cout<<"  --VERTEX  ID="<<ver->ID()<<"  x,y,z="<<xyz_vertex.X()<<","<<xyz_vertex.Y()<<","<<xyz_vertex.Z();
+              std::cout<<"    --VERTEX  ID="<<ver->ID()<<"  x,y,z="<<xyz_vertex.X()<<","<<xyz_vertex.Y()<<","<<xyz_vertex.Z();
               std::cout<<" Chi2="<<chi2<<" Chi2/DoF="<<chi2ndof<<" Status:"<<ver->status()<<",\n";
 
               fRecoVx= xyz_vertex.X();
@@ -339,7 +347,7 @@ void test::TPCAnalyzer::analyze(art::Event const& e)
 
               if(fApplyFiducialCut && std::abs(fRecoVx)<fXFidCut && std::abs(fRecoVy)<fYFidCut && fRecoVz>fZFidCut1 && fRecoVz<fZFidCut2){
                 //const double p[3]={fVx, fTrueVy, fTrueVz};
-                std::cout<<"HasTPC: "<<fGeom->HasTPC(fGeom->FindTPCAtPosition(xyz_vertex))<<" "
+                std::cout<<"     HasTPC: "<<fGeom->HasTPC(fGeom->FindTPCAtPosition(xyz_vertex))<<" "
                   <<fGeom->FindTPCAtPosition(xyz_vertex).TPC<<std::endl;
 
                 if( fGeom->HasTPC(fGeom->FindTPCAtPosition(xyz_vertex)) ){
@@ -368,6 +376,7 @@ void test::TPCAnalyzer::analyze(art::Event const& e)
             std::vector<art::Ptr<recob::Hit>> hitVect = cluster_hit_assns.at(cluster_v[i].key());
             std::cout<<"  ClusterID="<<cluster_v[i]->ID()<<" Hits: "<<hitVect.size()<<std::endl;
             for (const art::Ptr<recob::Hit> &hit: hitVect){
+              fHitsView.push_back(hit->View());
               fHitsPeakTime.push_back(hit->PeakTime());
               fHitsIntegral.push_back(hit->Integral());
               fHitsChannel.push_back(hit->Channel());
@@ -381,10 +390,10 @@ void test::TPCAnalyzer::analyze(art::Event const& e)
             }
           }
 
-          //Read the tracks and store hits
+          //Read the tracks and store the PFParticle start/end points
           std::vector<art::Ptr<recob::Track>> track_v = pfp_track_assns.at(pfp.key());
           for(size_t i=0; i<track_v.size(); i++){
-            std::cout<<"Track number "<<i<<std::endl;
+            std::cout<<"     * Track number "<<i<<std::endl;
             std::cout<<"   "<<track_v[i]->Vertex()<<std::endl;
             std::cout<<"   "<<track_v[i]->End()<<std::endl;
             
@@ -395,12 +404,19 @@ void test::TPCAnalyzer::analyze(art::Event const& e)
           }
         }
 
-    }
+        // if save reco1, save one slice per entry 
+        // one entry per slice
+        if(isNeutrino){
+          fTree->Fill();
+        }
+        
+
+    }//end slice loop
 
     if(fSaveSpacePoints){
       art::Handle<std::vector<recob::SpacePoint>> eventSpacePoints;
       std::vector<art::Ptr<recob::SpacePoint>> eventSpacePointsVect;
-      std::cout<<" --- Saving recob::SpacePoints\n";
+      std::cout<<"  --- Saving recob::SpacePoints\n";
 
       e.getByLabel(fSpacePointLabel, eventSpacePoints);
       art::fill_ptr_vector(eventSpacePointsVect, eventSpacePoints);
@@ -420,10 +436,14 @@ void test::TPCAnalyzer::analyze(art::Event const& e)
 
       }
     }
+
+  } //end SaveReco2 block
+
+  // if save reco1, save one event per entry
+  if(fSaveReco2==false){
+    fTree->Fill();
   }
-
-
-  fTree->Fill();
+  
 }
 
 
@@ -431,50 +451,8 @@ int test::TPCAnalyzer::VertexToDriftTick(double vt, double vx){
   return int( ( vt/1000 + ( fWirePlanePosition-std::abs(vx) )/fDriftVelocity - fTriggerOffsetTPC)/fTickPeriodTPC );
 }
 
-
-void test::TPCAnalyzer::resetVars()
+void test::TPCAnalyzer::resetRecoVars()
 {
-  if(fSaveTruth){
-    fTruePrimariesPDG.clear();
-    fTruePrimariesE.clear();
-    fTrueVx=-1e3;
-    fTrueVy=-1e3;
-    fTrueVz=-1e3;
-    fTrueVt=-1e3;
-    fTrueVU=-1;
-    fTrueVV=-1;
-    fTrueVC=-1;
-    fTrueVTimeTick=-1;
-    fTrueVEnergy=-1e3;
-  }
-
-  if(fSaveSimED){
-    fEnDepE.clear();
-    fEnDepX.clear();
-    fEnDepY.clear();
-    fEnDepZ.clear();
-    fEnDepU.clear();
-    fEnDepV.clear();
-    fEnDepC.clear();
-    fEnDepT.clear();
-  }
-
-  if(fSaveSimEDOut){
-    fEnDepEOut.clear();
-    fEnDepXOut.clear();
-    fEnDepYOut.clear();
-    fEnDepZOut.clear();
-    fEnDepTOut.clear();
-  }
-  if(fSaveWaveforms){
-    fRawChannelID.clear();
-    fRawChannelID.resize(fNChannels, -1);
-    fRawChannelADC.clear();
-    fRawChannelADC.resize(fNChannels, std::vector<double>(0));
-    //for(size_t k=0; k<fNChannels; k++){fRawChannelADC[k].reserve(fReadoutWindow);}
-    fRawChannelPedestal.resize(fNChannels, -1e3);
-  }
-
   if(fSaveWires){
     fNROIs=0;
     fWireID.clear();
@@ -485,6 +463,7 @@ void test::TPCAnalyzer::resetVars()
   }
 
   if(fSaveHits){
+    fHitsView.clear();
     fHitsIntegral.clear();
     fHitsPeakTime.clear();
     fHitsChannel.clear();
@@ -520,5 +499,52 @@ void test::TPCAnalyzer::resetVars()
     fPFTrackStart.clear();
     fPFTrackEnd.clear();
   }
+}
+
+void test::TPCAnalyzer::resetVars()
+{
+  if(fSaveTruth){
+    fTruePrimariesPDG.clear();
+    fTruePrimariesE.clear();
+    fTrueVx=-1e3;
+    fTrueVy=-1e3;
+    fTrueVz=-1e3;
+    fTrueVt=-1e3;
+    fTrueVU=-1;
+    fTrueVV=-1;
+    fTrueVC=-1;
+    fTrueVTimeTick=-1;
+    fTrueVEnergy=-1e3;
+  }
+
+  if(fSaveSimED){
+    fEnDepE.clear();
+    fEnDepX.clear();
+    fEnDepY.clear();
+    fEnDepZ.clear();
+    fEnDepU.clear();
+    fEnDepV.clear();
+    fEnDepC.clear();
+    fEnDepT.clear();
+  }
+
+  if(fSaveSimEDOut){
+    fEnDepEOut.clear();
+    fEnDepXOut.clear();
+    fEnDepYOut.clear();
+    fEnDepZOut.clear();
+    fEnDepTOut.clear();
+  }
+  
+  if(fSaveWaveforms){
+    fRawChannelID.clear();
+    fRawChannelID.resize(fNChannels, -1);
+    fRawChannelADC.clear();
+    fRawChannelADC.resize(fNChannels, std::vector<double>(0));
+    //for(size_t k=0; k<fNChannels; k++){fRawChannelADC[k].reserve(fReadoutWindow);}
+    fRawChannelPedestal.resize(fNChannels, -1e3);
+  }
+
+  resetRecoVars();
 
 }

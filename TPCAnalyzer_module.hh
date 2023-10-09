@@ -104,6 +104,7 @@ private:
 
   // Declare member data here.
   void resetVars();
+  void resetRecoVars();
   int VertexToDriftTick(double vt, double vx);
 
   std::string fMCTruthLabel;
@@ -165,6 +166,7 @@ private:
   std::vector<double> fEnDepTOut;
 
   //Hit variables
+  std::vector<int> fHitsView;
   std::vector<double> fHitsPeakTime;
   std::vector<double> fHitsIntegral;
   std::vector<double> fHitsChannel;
@@ -295,6 +297,7 @@ void test::TPCAnalyzer::beginJob()
   }
 
   if(fSaveHits){
+    fTree->Branch("HitsView", &fHitsView);
     fTree->Branch("HitsIntegral", &fHitsIntegral);
     fTree->Branch("HitsPeakTime", &fHitsPeakTime);
     fTree->Branch("HitsChannel", &fHitsChannel);
