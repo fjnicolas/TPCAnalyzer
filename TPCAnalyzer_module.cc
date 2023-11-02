@@ -9,7 +9,6 @@
 
 #include "sbndcode/TPCAnalyzer/TPCAnalyzer_module.hh"
 
-
 // Constructor
 test::TPCAnalyzer::TPCAnalyzer(fhicl::ParameterSet const& p)
   : EDAnalyzer{p},
@@ -78,6 +77,7 @@ void test::TPCAnalyzer::analyze(art::Event const& e)
   fRunID = e.id().run();
   fSubRunID = e.id().subRun();
   fEventID = e.id().event();
+
   //Reset tree variables
   resetVars();
 
@@ -96,6 +96,16 @@ void test::TPCAnalyzer::analyze(art::Event const& e)
         if( TruePart.StatusCode()==1 ){
           fTruePrimariesPDG.push_back( TruePart.PdgCode() );
           fTruePrimariesE.push_back( TruePart.E() );
+          if( TruePart.PdgCode()==2212 ) fIntNProtons++;
+          if( TruePart.PdgCode()==2112 ) fIntNNeutrons++;
+          if( TruePart.PdgCode()==111 ) fIntNPi0++;
+          if( TruePart.PdgCode()==211 ) fIntNPip++;
+          if( TruePart.PdgCode()==-211 ) fIntNPim++;
+          if( TruePart.PdgCode()==13 ) fIntNMuonP++;
+          if( TruePart.PdgCode()==-13 ) fIntNMuonM++;
+          if( TruePart.PdgCode()==11 ) fIntNElectronP++;
+          if( TruePart.PdgCode()==-11 ) fIntNElectronM++;
+          if( TruePart.PdgCode()==3122 ) fIntNLambda++;
         }
 
         if( TruePart.Mother()==-1 && ( abs(TruePart.PdgCode())==12 || abs(TruePart.PdgCode())==14 ) ){
@@ -119,12 +129,16 @@ void test::TPCAnalyzer::analyze(art::Event const& e)
             std::cout<<fSCE->EnableSimSpatialSCE()<<" "<<fSCE->EnableSimEfieldSCE()<<" "<<fSCE->EnableCorrSCE()<<" "<<fSCE->EnableCalSpatialSCE()<<std::endl;
           }
           
-          if(fApplyFiducialCut && std::abs(fTrueVx)<fXFidCut && std::abs(fTrueVy)<fYFidCut && fTrueVz>fZFidCut1 && fTrueVz<fZFidCut2){
+          fIntMode = truth.GetNeutrino().Mode();
+          fIntCCNC = truth.GetNeutrino().CCNC();
+          fIntInFV = PointInFV(fTrueVx, fTrueVy, fTrueVz);
+
+          if(fApplyFiducialCut && PointInFV(fTrueVx, fTrueVy, fTrueVz)){
             geo::Point_t po ={fTrueVx, fTrueVy, fTrueVz};
 
             std::cout<<"HasTPC: "<<fGeom->HasTPC(fGeom->FindTPCAtPosition(po))<<" "<<fGeom->FindTPCAtPosition(po).TPC<<std::endl;
 
-
+            
             if( fGeom->HasTPC(fGeom->FindTPCAtPosition(po)) ){
               
               unsigned int tpcID=fGeom->FindTPCAtPosition(po).TPC;
@@ -345,7 +359,7 @@ void test::TPCAnalyzer::analyze(art::Event const& e)
               fRecoVy= xyz_vertex.Y();
               fRecoVz= xyz_vertex.Z();
 
-              if(fApplyFiducialCut && std::abs(fRecoVx)<fXFidCut && std::abs(fRecoVy)<fYFidCut && fRecoVz>fZFidCut1 && fRecoVz<fZFidCut2){
+              if(fApplyFiducialCut && PointInFV(fRecoVx, fRecoVy, fRecoVz)){
                 //const double p[3]={fVx, fTrueVy, fTrueVz};
                 std::cout<<"     HasTPC: "<<fGeom->HasTPC(fGeom->FindTPCAtPosition(xyz_vertex))<<" "
                   <<fGeom->FindTPCAtPosition(xyz_vertex).TPC<<std::endl;
@@ -451,8 +465,74 @@ int test::TPCAnalyzer::VertexToDriftTick(double vt, double vx){
   return int( ( vt/1000 + ( fWirePlanePosition-std::abs(vx) )/fDriftVelocity - fTriggerOffsetTPC)/fTickPeriodTPC );
 }
 
+
+bool test::TPCAnalyzer::PointInFV(double x, double y, double z){
+  return ( std::abs(x)>fXFidCut1 && std::abs(x)<fXFidCut2 && std::abs(y)<fYFidCut && z>fZFidCut1 && z<fZFidCut2 );
+}
+
+void test::TPCAnalyzer::resetTrueVars(){
+  
+  if(fSaveTruth){
+    fTruePrimariesPDG.clear();
+    fTruePrimariesE.clear();
+    fTrueVx=-1e3;
+    fTrueVy=-1e3;
+    fTrueVz=-1e3;
+    fTrueVt=-1e3;
+    fTrueVU=-1;
+    fTrueVV=-1;
+    fTrueVC=-1;
+    fTrueVTimeTick=-1;
+    fTrueVEnergy=-1e3;
+
+    fIntMode = -1;
+    fIntCCNC = -1;
+    fIntNProtons = 0;
+    fIntNNeutrons = 0;
+    fIntNPi0 = 0;
+    fIntNPip = 0;
+    fIntNPim = 0;
+    fIntNMuonP = 0;
+    fIntNMuonM = 0;
+    fIntNElectronP = 0;
+    fIntNElectronM = 0;
+    fIntNLambda = 0;
+  }
+
+  if(fSaveSimED){
+    fEnDepE.clear();
+    fEnDepX.clear();
+    fEnDepY.clear();
+    fEnDepZ.clear();
+    fEnDepU.clear();
+    fEnDepV.clear();
+    fEnDepC.clear();
+    fEnDepT.clear();
+  }
+
+  if(fSaveSimEDOut){
+    fEnDepEOut.clear();
+    fEnDepXOut.clear();
+    fEnDepYOut.clear();
+    fEnDepZOut.clear();
+    fEnDepTOut.clear();
+  }
+}
+
+void test::TPCAnalyzer::resetSimVars(){
+  if(fSaveWaveforms){
+    fRawChannelID.clear();
+    fRawChannelID.resize(fNChannels, -1);
+    fRawChannelADC.clear();
+    fRawChannelADC.resize(fNChannels, std::vector<double>(0));
+    //for(size_t k=0; k<fNChannels; k++){fRawChannelADC[k].reserve(fReadoutWindow);}
+    fRawChannelPedestal.resize(fNChannels, -1e3);
+  }
+}
+
 void test::TPCAnalyzer::resetRecoVars()
 {
+
   if(fSaveWires){
     fNROIs=0;
     fWireID.clear();
@@ -503,48 +583,7 @@ void test::TPCAnalyzer::resetRecoVars()
 
 void test::TPCAnalyzer::resetVars()
 {
-  if(fSaveTruth){
-    fTruePrimariesPDG.clear();
-    fTruePrimariesE.clear();
-    fTrueVx=-1e3;
-    fTrueVy=-1e3;
-    fTrueVz=-1e3;
-    fTrueVt=-1e3;
-    fTrueVU=-1;
-    fTrueVV=-1;
-    fTrueVC=-1;
-    fTrueVTimeTick=-1;
-    fTrueVEnergy=-1e3;
-  }
-
-  if(fSaveSimED){
-    fEnDepE.clear();
-    fEnDepX.clear();
-    fEnDepY.clear();
-    fEnDepZ.clear();
-    fEnDepU.clear();
-    fEnDepV.clear();
-    fEnDepC.clear();
-    fEnDepT.clear();
-  }
-
-  if(fSaveSimEDOut){
-    fEnDepEOut.clear();
-    fEnDepXOut.clear();
-    fEnDepYOut.clear();
-    fEnDepZOut.clear();
-    fEnDepTOut.clear();
-  }
-  
-  if(fSaveWaveforms){
-    fRawChannelID.clear();
-    fRawChannelID.resize(fNChannels, -1);
-    fRawChannelADC.clear();
-    fRawChannelADC.resize(fNChannels, std::vector<double>(0));
-    //for(size_t k=0; k<fNChannels; k++){fRawChannelADC[k].reserve(fReadoutWindow);}
-    fRawChannelPedestal.resize(fNChannels, -1e3);
-  }
-
+  resetTrueVars();
+  resetSimVars();
   resetRecoVars();
-
 }

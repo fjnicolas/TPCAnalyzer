@@ -67,10 +67,11 @@
 #include <fstream>
 #include <iostream>
 
-#define fXFidCut 200
-#define fYFidCut 200
-#define fZFidCut1 5
-#define fZFidCut2 495
+#define fXFidCut1 1.5
+#define fXFidCut2 190
+#define fYFidCut 190
+#define fZFidCut1 10
+#define fZFidCut2 490
 
 #define fDefaulNeutrinoID 99999
 
@@ -104,8 +105,11 @@ private:
 
   // Declare member data here.
   void resetVars();
+  void resetTrueVars();
+  void resetSimVars();
   void resetRecoVars();
   int VertexToDriftTick(double vt, double vx);
+  bool PointInFV(double x, double y, double z);
 
   std::string fMCTruthLabel;
   std::string fSimEnergyDepositLabel;
@@ -147,6 +151,19 @@ private:
   int fTrueVC;
   int fTrueVTimeTick;
   double fTrueVEnergy;
+  int fIntMode;
+  int fIntCCNC;
+  int fIntNProtons;
+  int fIntNNeutrons;
+  int fIntNPi0;
+  int fIntNPip;
+  int fIntNPim;
+  int fIntNMuonP;
+  int fIntNMuonM;
+  int fIntNElectronP;
+  int fIntNElectronM;
+  int fIntNLambda;
+  bool fIntInFV;
 
   //True SimEnergyDeposits
   std::vector<double> fEnDepE;
@@ -207,6 +224,8 @@ private:
   int fRecoVC;
   int fRecoVTimeTick;
 
+  bool fRecoInFV;
+
   // Reco track start/end points
   std::vector<std::vector<double>> fPFTrackStart;
   std::vector<std::vector<double>> fPFTrackEnd;
@@ -254,6 +273,19 @@ void test::TPCAnalyzer::beginJob()
     fTree->Branch("TrueVC", &fTrueVC, "TrueVC/I");
     fTree->Branch("TrueVTimeTick", &fTrueVTimeTick, "TrueVC/I");
     fTree->Branch("TrueVEnergy", &fTrueVEnergy, "TrueVEnergy/D");
+    fTree->Branch("IntMode", &fIntMode, "IntMode/I");
+    fTree->Branch("IntCCNC", &fIntCCNC, "IntCCMC/I");
+    fTree->Branch("IntNProtons", &fIntNProtons, "IntNProtons/I");
+    fTree->Branch("IntNNeutrons", &fIntNNeutrons, "IntNNeutrons/I");
+    fTree->Branch("IntNPi0", &fIntNPi0, "IntNPi0/I");
+    fTree->Branch("IntNPip", &fIntNPip, "IntNPip/I");
+    fTree->Branch("IntNPim", &fIntNPim, "IntNPim/I");
+    fTree->Branch("IntNMuonP", &fIntNMuonP, "IntNMuonP/I");
+    fTree->Branch("IntNMuonM", &fIntNMuonM, "IntNMuonM/I");
+    fTree->Branch("IntNElectronP", &fIntNElectronP, "IntNElectronP/I");
+    fTree->Branch("IntNElectronM", &fIntNElectronM, "IntNElectronM/I");
+    fTree->Branch("IntNLambda", &fIntNLambda, "IntNLambda/I");
+    fTree->Branch("IntInFV", &fIntInFV, "IntInFV/O");
   }
 
   if(fSaveSimED){
@@ -325,6 +357,7 @@ void test::TPCAnalyzer::beginJob()
     fTree->Branch("RecoVV", &fRecoVV, "RecoVV/I");
     fTree->Branch("RecoVC", &fRecoVC, "RecoVC/I");
     fTree->Branch("RecoVTimeTick", &fRecoVTimeTick, "RecoVC/I");
+    fTree->Branch("RecoInFV", &fRecoInFV, "RecoInFV/O");
   }
 
   if(fSaveReco2){
