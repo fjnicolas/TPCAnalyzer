@@ -229,6 +229,7 @@ private:
   // Reco track start/end points
   std::vector<std::vector<double>> fPFTrackStart;
   std::vector<std::vector<double>> fPFTrackEnd;
+  std::vector<double> fPFPDGCode;
 
   int fNAnalyzedEvents;
 
@@ -363,6 +364,7 @@ void test::TPCAnalyzer::beginJob()
   if(fSaveReco2){
     fTree->Branch("PFTrackStart", &fPFTrackStart);
     fTree->Branch("PFTrackEnd", &fPFTrackEnd);
+    fTree->Branch("PFPDGCode", &fPFPDGCode);
   }
   fNAnalyzedEvents=0;
 }

@@ -415,6 +415,7 @@ void test::TPCAnalyzer::analyze(art::Event const& e)
             std::vector<double> end {track_v[i]->End().X(), track_v[i]->End().Y(), track_v[i]->End().Z()};
             fPFTrackStart.push_back(start);
             fPFTrackEnd.push_back(end);
+            fPFPDGCode.push_back(pfp->PdgCode());
           }
         }
 
@@ -578,6 +579,7 @@ void test::TPCAnalyzer::resetRecoVars()
   if(fSaveReco2){
     fPFTrackStart.clear();
     fPFTrackEnd.clear();
+    fPFPDGCode.clear();
   }
 }
 
