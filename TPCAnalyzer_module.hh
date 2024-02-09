@@ -2,9 +2,6 @@
 // Class:       TPCAnalyzer
 // Plugin Type: analyzer (art v3_05_01)
 // File:        TPCAnalyzer_module.cc
-//
-// Generated at Mon Mar 15 04:43:39 2021 by Marina Bravo using cetskelgen
-// from cetlib version v3_10_00.
 ////////////////////////////////////////////////////////////////////////
 
 #include "art/Framework/Core/EDAnalyzer.h"
@@ -53,6 +50,8 @@
 #include "lardataobj/RecoBase/Vertex.h"
 #include "lardataobj/RecoBase/Slice.h"
 
+#include "sbndcode/HyperonAnalyzer/LambdaTruthManager/LambdaTruthManager.hh"
+
 
 #include "TTree.h"
 #include "TFile.h"
@@ -67,11 +66,13 @@
 #include <fstream>
 #include <iostream>
 
+
 #define fXFidCut1 1.5
 #define fXFidCut2 190
 #define fYFidCut 190
 #define fZFidCut1 10
 #define fZFidCut2 490
+
 
 #define fDefaulNeutrinoID 99999
 
@@ -112,6 +113,7 @@ private:
   bool PointInFV(double x, double y, double z);
 
   std::string fMCTruthLabel;
+  std::string fMCLabel;
   std::string fSimEnergyDepositLabel;
   std::string fSimEnergyDepositInstanceLabel;
   std::string fSimEnergyDepositLabelOut;
@@ -142,6 +144,7 @@ private:
   //True variables
   std::vector<int> fTruePrimariesPDG;
   std::vector<double> fTruePrimariesE;
+  std::vector<std::vector<double>> fTruePrimariesStartP;
   double fTrueVx;
   double fTrueVy;
   double fTrueVz;
@@ -164,6 +167,8 @@ private:
   int fIntNElectronM;
   int fIntNLambda;
   bool fIntInFV;
+  std::vector<double> fLambdaProtonPDir;
+  std::vector<double> fLambdaPionPDir;
 
   //True SimEnergyDeposits
   std::vector<double> fEnDepE;
@@ -174,6 +179,8 @@ private:
   std::vector<double> fEnDepV;
   std::vector<double> fEnDepC;
   std::vector<double> fEnDepT;
+  std::vector<int>    fEnDepPDG;
+
 
   //True SimEnergyDeposits Out
   std::vector<double> fEnDepEOut;
@@ -186,6 +193,7 @@ private:
   std::vector<int> fHitsView;
   std::vector<double> fHitsPeakTime;
   std::vector<double> fHitsIntegral;
+  std::vector<double> fHitsSummedADC;
   std::vector<double> fHitsChannel;
   std::vector<double> fHitsRMS;
   std::vector<double> fHitsStartT;
@@ -194,6 +202,10 @@ private:
   std::vector<double> fHitsChi2;
   std::vector<double> fHitsNDF;
   std::vector<int> fHitsClusterID;
+  std::vector<double> fHitsX;
+  std::vector<double> fHitsY;
+  std::vector<double> fHitsZ;
+
 
   // Slice variables
   int fNSlices;
@@ -265,6 +277,7 @@ void test::TPCAnalyzer::beginJob()
   if(fSaveTruth){
     fTree->Branch("TruePrimariesPDG", &fTruePrimariesPDG);
     fTree->Branch("TruePrimariesE", &fTruePrimariesE);
+    fTree->Branch("TruePrimariesStartP", &fTruePrimariesStartP);
     fTree->Branch("TrueVx", &fTrueVx, "TrueVx/D");
     fTree->Branch("TrueVy", &fTrueVy, "TrueVy/D");
     fTree->Branch("TrueVz", &fTrueVz, "TrueVz/D");
@@ -287,6 +300,8 @@ void test::TPCAnalyzer::beginJob()
     fTree->Branch("IntNElectronM", &fIntNElectronM, "IntNElectronM/I");
     fTree->Branch("IntNLambda", &fIntNLambda, "IntNLambda/I");
     fTree->Branch("IntInFV", &fIntInFV, "IntInFV/O");
+    fTree->Branch("LambdaProtonPDir", &fLambdaProtonPDir);
+    fTree->Branch("LambdaPionPDir", &fLambdaPionPDir);
   }
 
   if(fSaveSimED){
@@ -298,6 +313,7 @@ void test::TPCAnalyzer::beginJob()
     fTree->Branch("EnDepV", &fEnDepV);
     fTree->Branch("EnDepC", &fEnDepC);
     fTree->Branch("EnDepT", &fEnDepT);
+    fTree->Branch("EnDepPDG", &fEnDepPDG);
   }
 
   if(fSaveSimEDOut){
@@ -332,6 +348,7 @@ void test::TPCAnalyzer::beginJob()
   if(fSaveHits){
     fTree->Branch("HitsView", &fHitsView);
     fTree->Branch("HitsIntegral", &fHitsIntegral);
+    fTree->Branch("HitsSummedADC", &fHitsSummedADC);
     fTree->Branch("HitsPeakTime", &fHitsPeakTime);
     fTree->Branch("HitsChannel", &fHitsChannel);
     fTree->Branch("HitsRMS", &fHitsRMS);
@@ -341,6 +358,10 @@ void test::TPCAnalyzer::beginJob()
     fTree->Branch("HitsChi2", &fHitsChi2);
     fTree->Branch("HitsNDF", &fHitsNDF);
     fTree->Branch("HitsClusterID", &fHitsClusterID);
+    fTree->Branch("HitsX", &fHitsX);
+    fTree->Branch("HitsY", &fHitsY);
+    fTree->Branch("HitsZ", &fHitsZ);
+    
   }
 
   if(fSaveSpacePoints){

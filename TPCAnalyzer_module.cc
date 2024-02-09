@@ -2,9 +2,6 @@
 // Class:       TPCAnalyzer
 // Plugin Type: analyzer (art v3_05_01)
 // File:        TPCAnalyzer_module.cc
-//
-// Generated at Mon Mar 15 04:43:39 2021 by Marina Bravo using cetskelgen
-// from cetlib version v3_10_00.
 ////////////////////////////////////////////////////////////////////////
 
 #include "sbndcode/TPCAnalyzer/TPCAnalyzer_module.hh"
@@ -13,6 +10,7 @@
 test::TPCAnalyzer::TPCAnalyzer(fhicl::ParameterSet const& p)
   : EDAnalyzer{p},
   fMCTruthLabel( p.get<std::string>("MCTruthLabel", "generator") ),
+  fMCLabel( p.get<std::string>("MCLabel", "largeant") ),
   fSimEnergyDepositLabel( p.get<std::string>("SimEnergyDepositLabel", "ionandscint") ),
   fSimEnergyDepositInstanceLabel( p.get<std::string>("SimEnergyDepositInstanceLabel", "priorSCE") ),
   fSimEnergyDepositLabelOut( p.get<std::string>("SimEnergyDepositLabelOut", "ionandscintout") ),
@@ -162,6 +160,34 @@ void test::TPCAnalyzer::analyze(art::Event const& e)
         }
       }
     }
+
+
+    // --- Fill the true information
+    // --- Fill the true lambda variables
+    // Get the handles
+    art::Handle<std::vector<simb::MCTruth>> mctruthHandle;
+    std::vector<art::Ptr<simb::MCTruth>> mctruthVect;
+    e.getByLabel(fMCTruthLabel, mctruthHandle);
+    art::fill_ptr_vector(mctruthVect, mctruthHandle);
+      //............................Read MCParticles
+    art::Handle< std::vector<simb::MCParticle> > mcparticleHandle;
+    std::vector<art::Ptr<simb::MCParticle>> mcpVect;
+    e.getByLabel(fMCLabel, mcparticleHandle);
+    art::fill_ptr_vector(mcpVect, mcparticleHandle);
+
+    bool fFillLambdaTrue = true;
+    if(fFillLambdaTrue){
+      LambdaTruthManager lambdaMgr(mctruthVect, mcpVect);
+      std::cout<<" LAMBDA PROTON MOMENTUM: "<<lambdaMgr.ProtonMomentumDirection().X()<<" "<<lambdaMgr.ProtonMomentumDirection().Y()<<" "<<lambdaMgr.ProtonMomentumDirection().Z()<<std::endl;
+      fLambdaPionPDir.push_back(lambdaMgr.PionMomentumDirection().X());
+      fLambdaPionPDir.push_back(lambdaMgr.PionMomentumDirection().Y());
+      fLambdaPionPDir.push_back(lambdaMgr.PionMomentumDirection().Z());
+      fLambdaProtonPDir.push_back(lambdaMgr.ProtonMomentumDirection().X());
+      fLambdaProtonPDir.push_back(lambdaMgr.ProtonMomentumDirection().Y());
+      fLambdaProtonPDir.push_back(lambdaMgr.ProtonMomentumDirection().Z());
+    }
+
+
   }
 
 
@@ -172,18 +198,27 @@ void test::TPCAnalyzer::analyze(art::Event const& e)
     std::cout<<"  ---- Reading SimEnergyDeposition from handle: "<<SimEDHandle.provenance()->moduleLabel();
     std::cout<<":"<<SimEDHandle.provenance()->productInstanceName()<<" ----\n";
 
+    // Fill if valid handle
+    if(SimEDHandle.isValid()){
+      std::cout<<"  ---- SimEnergyDeposition handle is valid ----\n";
 
-    for (auto const& SimED : *SimEDHandle){
-      float y = SimED.MidPointY();
-      float z = SimED.MidPointZ();
-      fEnDepE.push_back(SimED.Energy());
-      fEnDepX.push_back(SimED.MidPointX());
-      fEnDepY.push_back(y);
-      fEnDepZ.push_back(z);
-      fEnDepU.push_back( (z*fCos60-y*fSin60)/fWirePitch );
-      fEnDepV.push_back( (z*fCos60+y*fSin60)/fWirePitch );
-      fEnDepC.push_back( z/fWirePitch );
-      fEnDepT.push_back( (SimED.StartT()+SimED.EndT())/2. );
+      for (auto const& SimED : *SimEDHandle){
+        float y = SimED.MidPointY();
+        float z = SimED.MidPointZ();
+        fEnDepE.push_back(SimED.Energy());
+        fEnDepX.push_back(SimED.MidPointX());
+        fEnDepY.push_back(y);
+        fEnDepZ.push_back(z);
+        fEnDepU.push_back( (z*fCos60-y*fSin60)/fWirePitch );
+        fEnDepV.push_back( (z*fCos60+y*fSin60)/fWirePitch );
+        fEnDepC.push_back( z/fWirePitch );
+        fEnDepT.push_back( (SimED.StartT()+SimED.EndT())/2. );
+        fEnDepPDG.push_back(SimED.PdgCode());
+      }
+
+    }
+    else{
+      std::cout<<"  ---- SimEnergyDeposition handle is NOT valid ----\n";
     }
   }
 
@@ -195,14 +230,23 @@ void test::TPCAnalyzer::analyze(art::Event const& e)
     std::cout<<"  ---- Reading SimEnergyDeposition from handle: "<<SimEDHandle.provenance()->moduleLabel();
     std::cout<<":"<<SimEDHandle.provenance()->productInstanceName()<<" ----\n";
 
+    if(SimEDHandle.isValid()){
+      std::cout<<"  ---- SimEnergyDeposition handle is valid ----\n";
+    
 
-    for (auto const& SimED : *SimEDHandle){
-      fEnDepEOut.push_back(SimED.Energy());
-      fEnDepXOut.push_back(SimED.MidPointX());
-      fEnDepYOut.push_back(SimED.MidPointY());
-      fEnDepZOut.push_back(SimED.MidPointZ());
-      fEnDepTOut.push_back( (SimED.StartT()+SimED.EndT())/2. );
+      for (auto const& SimED : *SimEDHandle){
+        fEnDepEOut.push_back(SimED.Energy());
+        fEnDepXOut.push_back(SimED.MidPointX());
+        fEnDepYOut.push_back(SimED.MidPointY());
+        fEnDepZOut.push_back(SimED.MidPointZ());
+        fEnDepTOut.push_back( (SimED.StartT()+SimED.EndT())/2. );
+      }
+    
     }
+    else{
+      std::cout<<"  ---- SimEnergyDeposition handle is NOT valid ----\n";
+    }
+
   }
 
 
@@ -259,24 +303,53 @@ void test::TPCAnalyzer::analyze(art::Event const& e)
 
 
   //............................Read Hits (Reco1 version)
-  if(fSaveHits && fSaveReco2==false){
-    art::Handle<std::vector<recob::Hit>> hitsHandle;
-    std::vector<art::Ptr<recob::Hit>> hitsVect;
-    std::cout<<" --- Saving recob::Hit\n";
-    e.getByLabel(fHitLabel, hitsHandle);
-    art::fill_ptr_vector(hitsVect, hitsHandle);
+  if(fSaveReco2==false){
 
-    for (const art::Ptr<recob::Hit> &hit: hitsVect){
-      fHitsPeakTime.push_back(hit->PeakTime());
-      fHitsIntegral.push_back(hit->Integral());
-      fHitsChannel.push_back(hit->Channel());
-      fHitsRMS.push_back(hit->RMS());
-      fHitsStartT.push_back(hit->StartTick());
-      fHitsEndT.push_back(hit->EndTick());
-      fHitsWidth.push_back( std::abs(hit->StartTick()-hit->EndTick()) );
-      fHitsChi2.push_back(hit->GoodnessOfFit());
-      fHitsNDF.push_back(hit->DegreesOfFreedom());
-      fHitsClusterID.push_back(0);
+    if(fSaveHits){
+      art::Handle<std::vector<recob::Hit>> hitsHandle;
+      std::vector<art::Ptr<recob::Hit>> hitsVect;
+      std::cout<<" --- Saving recob::Hit\n";
+      e.getByLabel(fHitLabel, hitsHandle);
+      art::fill_ptr_vector(hitsVect, hitsHandle);
+
+      for (const art::Ptr<recob::Hit> &hit: hitsVect){
+        fHitsPeakTime.push_back(hit->PeakTime());
+        fHitsIntegral.push_back(hit->Integral());
+        fHitsSummedADC.push_back(hit->SummedADC());
+        fHitsChannel.push_back(hit->Channel());
+        fHitsRMS.push_back(hit->RMS());
+        fHitsStartT.push_back(hit->StartTick());
+        fHitsEndT.push_back(hit->EndTick());
+        fHitsWidth.push_back( std::abs(hit->StartTick()-hit->EndTick()) );
+        fHitsChi2.push_back(hit->GoodnessOfFit());
+        fHitsNDF.push_back(hit->DegreesOfFreedom());
+        fHitsClusterID.push_back(0);
+      }
+    }
+    
+
+    if(fSaveSpacePoints){
+      art::Handle<std::vector<recob::SpacePoint>> eventSpacePoints;
+      std::vector<art::Ptr<recob::SpacePoint>> eventSpacePointsVect;
+      std::cout<<"  --- Saving recob::SpacePoints\n";
+
+      e.getByLabel(fSpacePointLabel, eventSpacePoints);
+      art::fill_ptr_vector(eventSpacePointsVect, eventSpacePoints);
+
+      art::FindManyP<recob::Hit> SPToHitAssoc (eventSpacePointsVect, e, fSpacePointLabel);
+
+      for (const art::Ptr<recob::SpacePoint> &SP: eventSpacePointsVect){
+
+        std::vector<art::Ptr<recob::Hit>> SPHit = SPToHitAssoc.at(SP.key());
+
+        if (SPHit.at(0)->WireID().Plane==2){
+          fSpacePointX.push_back(SP->position().X());
+          fSpacePointY.push_back(SP->position().Y());
+          fSpacePointZ.push_back(SP->position().Z());
+          fSpacePointIntegral.push_back(SPHit.at(0)->Integral());
+        }
+
+      }
     }
   }
 
@@ -285,6 +358,30 @@ void test::TPCAnalyzer::analyze(art::Event const& e)
 
     std::cout<<" --- Saving reco2\n";
     
+    // map to store the space points associated to hits
+    std::map<int, art::Ptr<recob::SpacePoint>> hitToSpacePointMap;
+
+
+    if(fSaveSpacePoints){
+      art::Handle<std::vector<recob::SpacePoint>> eventSpacePoints;
+      std::vector<art::Ptr<recob::SpacePoint>> eventSpacePointsVect;
+      std::cout<<"      ** Creating hit-space point map\n";
+
+      e.getByLabel(fSpacePointLabel, eventSpacePoints);
+      art::fill_ptr_vector(eventSpacePointsVect, eventSpacePoints);
+
+      art::FindManyP<recob::Hit> SPToHitAssoc (eventSpacePointsVect, e, fSpacePointLabel);
+
+      for (const art::Ptr<recob::SpacePoint> &SP: eventSpacePointsVect){
+
+        std::vector<art::Ptr<recob::Hit>> SPHit = SPToHitAssoc.at(SP.key());
+
+        //std::cout<<"  SpacePoint: "<<SP->ID()<<" "<<SPHit.at(0).key()<<std::endl;
+        hitToSpacePointMap[SPHit.at(0).key()] = SP;
+  
+      }
+    }
+
     // Necessary handles
     //Read Recob Slice
     ::art::Handle<std::vector<recob::Slice>> sliceHandle;
@@ -308,7 +405,7 @@ void test::TPCAnalyzer::analyze(art::Event const& e)
     std::vector<art::Ptr<recob::Hit>> hitVect;
    
 
-     // Associations
+    // Associations
     //Slice to PFParticles
     art::FindManyP<recob::PFParticle> slice_pfp_assns (sliceHandle, e, fReco2Label);
     //PF to cluster
@@ -320,9 +417,6 @@ void test::TPCAnalyzer::analyze(art::Event const& e)
     //PF to vertex
     art::FindManyP<recob::Vertex> pfp_vertex_assns(pfpHandle, e, fReco2Label);
 
-    //Slice association for vertex
-    //art::FindManyP<recob::Hit> slice_hit_assns (sliceHandle, e, fSliceLabel);
-    
     // Loop over slices
     art::fill_ptr_vector(sliceVect, sliceHandle);
     fNSlices = sliceVect.size();
@@ -341,7 +435,7 @@ void test::TPCAnalyzer::analyze(art::Event const& e)
         bool isNeutrino = false;
         for(const art::Ptr<recob::PFParticle> &pfp : pfpVect){
 
-          std::cout<<"   ** PFParticle: "<<pfp->Self()<<"      PDG:"<<pfp->PdgCode()<<"  Primary="<<pfp->IsPrimary()<<std::endl;
+          std::cout<<"   ** PFParticle: "<<pfp->Self()<<"      PDG:"<<pfp->PdgCode()<<"  Primary="<<pfp->IsPrimary()<<" Mother="<<pfp->Parent()<<std::endl;
 
           // Save reconstructed neutrino vertex
           if(  pfp->IsPrimary() && ( std::abs(pfp->PdgCode())==12 || std::abs(pfp->PdgCode())==14 ) ){
@@ -358,6 +452,8 @@ void test::TPCAnalyzer::analyze(art::Event const& e)
               fRecoVx= xyz_vertex.X();
               fRecoVy= xyz_vertex.Y();
               fRecoVz= xyz_vertex.Z();
+
+              std::cout<<"  Reco vertex in FV "<<PointInFV(fRecoVx, fRecoVy, fRecoVz)<<std::endl;
 
               if(fApplyFiducialCut && PointInFV(fRecoVx, fRecoVy, fRecoVz)){
                 //const double p[3]={fVx, fTrueVy, fTrueVz};
@@ -393,6 +489,7 @@ void test::TPCAnalyzer::analyze(art::Event const& e)
               fHitsView.push_back(hit->View());
               fHitsPeakTime.push_back(hit->PeakTime());
               fHitsIntegral.push_back(hit->Integral());
+              fHitsSummedADC.push_back(hit->SummedADC());
               fHitsChannel.push_back(hit->Channel());
               fHitsRMS.push_back(hit->RMS());
               fHitsStartT.push_back(hit->StartTick());
@@ -401,6 +498,24 @@ void test::TPCAnalyzer::analyze(art::Event const& e)
               fHitsChi2.push_back(hit->GoodnessOfFit());
               fHitsNDF.push_back(hit->DegreesOfFreedom());
               fHitsClusterID.push_back(pfp->Self());
+              std::cout<<"   Hit: "<<hit.key()<<"\n";
+              if(fSaveSpacePoints){
+                if(hitToSpacePointMap.find(hit.key())!=hitToSpacePointMap.end()){
+                  fHitsX.push_back(hitToSpacePointMap[hit.key()]->XYZ()[0]);
+                  fHitsY.push_back(hitToSpacePointMap[hit.key()]->XYZ()[1]);
+                  fHitsZ.push_back(hitToSpacePointMap[hit.key()]->XYZ()[2]);
+                }
+                else{
+                  fHitsX.push_back(-999);
+                  fHitsY.push_back(-999);
+                  fHitsZ.push_back(-999);
+                }
+              }
+              else{
+                fHitsX.push_back(-999);
+                fHitsY.push_back(-999);
+                fHitsZ.push_back(-999);
+              }
             }
           }
 
@@ -428,30 +543,6 @@ void test::TPCAnalyzer::analyze(art::Event const& e)
 
     }//end slice loop
 
-    if(fSaveSpacePoints){
-      art::Handle<std::vector<recob::SpacePoint>> eventSpacePoints;
-      std::vector<art::Ptr<recob::SpacePoint>> eventSpacePointsVect;
-      std::cout<<"  --- Saving recob::SpacePoints\n";
-
-      e.getByLabel(fSpacePointLabel, eventSpacePoints);
-      art::fill_ptr_vector(eventSpacePointsVect, eventSpacePoints);
-
-      art::FindManyP<recob::Hit> SPToHitAssoc (eventSpacePointsVect, e, fSpacePointLabel);
-
-      for (const art::Ptr<recob::SpacePoint> &SP: eventSpacePointsVect){
-
-        std::vector<art::Ptr<recob::Hit>> SPHit = SPToHitAssoc.at(SP.key());
-
-        if (SPHit.at(0)->WireID().Plane==2){
-          fSpacePointX.push_back(SP->position().X());
-          fSpacePointY.push_back(SP->position().Y());
-          fSpacePointZ.push_back(SP->position().Z());
-          fSpacePointIntegral.push_back(SPHit.at(0)->Integral());
-        }
-
-      }
-    }
-
   } //end SaveReco2 block
 
   // if save reco1, save one event per entry
@@ -476,6 +567,7 @@ void test::TPCAnalyzer::resetTrueVars(){
   if(fSaveTruth){
     fTruePrimariesPDG.clear();
     fTruePrimariesE.clear();
+    fTruePrimariesStartP.clear();
     fTrueVx=-1e3;
     fTrueVy=-1e3;
     fTrueVz=-1e3;
@@ -498,6 +590,9 @@ void test::TPCAnalyzer::resetTrueVars(){
     fIntNElectronP = 0;
     fIntNElectronM = 0;
     fIntNLambda = 0;
+
+    fLambdaProtonPDir.clear();
+    fLambdaPionPDir.clear();
   }
 
   if(fSaveSimED){
@@ -509,6 +604,7 @@ void test::TPCAnalyzer::resetTrueVars(){
     fEnDepV.clear();
     fEnDepC.clear();
     fEnDepT.clear();
+    fEnDepPDG.clear();
   }
 
   if(fSaveSimEDOut){
@@ -546,6 +642,7 @@ void test::TPCAnalyzer::resetRecoVars()
   if(fSaveHits){
     fHitsView.clear();
     fHitsIntegral.clear();
+    fHitsSummedADC.clear();
     fHitsPeakTime.clear();
     fHitsChannel.clear();
     fHitsRMS.clear();
@@ -555,6 +652,9 @@ void test::TPCAnalyzer::resetRecoVars()
     fHitsChi2.clear();
     fHitsNDF.clear();
     fHitsClusterID.clear();
+    fHitsX.clear();
+    fHitsY.clear();
+    fHitsZ.clear();
   }
 
   fNSlices = 0;
