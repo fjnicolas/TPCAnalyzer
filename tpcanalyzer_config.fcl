@@ -15,6 +15,7 @@ tpcana:
   VertexLabel: "pandora"
   Reco2Label: "pandora"
   TrackLabel: "pandoraTrack"
+  ClusterLabel: "pandora"
 
   SaveReco2: false
   SaveTruth: true
@@ -28,6 +29,8 @@ tpcana:
   CreateTPCMap: false
   ApplyFiducialCut: true
   ApplyVertexSCE: true
+
+  UseSlices: true
 
 }
 END_PROLOG

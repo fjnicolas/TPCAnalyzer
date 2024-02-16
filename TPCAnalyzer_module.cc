@@ -20,6 +20,7 @@ test::TPCAnalyzer::TPCAnalyzer(fhicl::ParameterSet const& p)
   fHitLabel( p.get<std::string>("HitLabel", "gaushit") ),
   fReco2Label( p.get<std::string>("Reco2Label", "pandora") ),
   fTrackLabel( p.get<std::string>("TrackLabel", "pandoraTrack") ),
+  fClusterLabel( p.get<std::string>("ClusterLabel", "pandora") ),
   fSpacePointLabel( p.get<std::string>("SpacePointLabel", "pandora") ),
   fVertexLabel( p.get<std::string>("VertexLabel", "pandora") ),
   fSaveReco2( p.get<bool>("SaveReco2", "false") ),
@@ -34,6 +35,7 @@ test::TPCAnalyzer::TPCAnalyzer(fhicl::ParameterSet const& p)
   fCreateTPCMap( p.get<bool>("CreateTPCMap", "false") ),
   fApplyFiducialCut( p.get<bool>("ApplyFiducialCut", "true") ),
   fApplyVertexSCE( p.get<bool>("ApplyVertexSCE", "true") ),
+  fUseSlices( p.get<bool>("UseSlices", "true") ),
   fNChannels(fGeom->Nchannels())
   // More initializers here.
 {
@@ -62,6 +64,158 @@ test::TPCAnalyzer::TPCAnalyzer(fhicl::ParameterSet const& p)
   for(size_t k=0; k<fNChannels; k++) fRawChannelADC[k].reserve(fReadoutWindow);
 }
 
+// Fill Hits function
+void test::TPCAnalyzer::FillHits(int clusterId, std::vector<art::Ptr<recob::Hit>> hitVect, std::map<int, art::Ptr<recob::SpacePoint>> hitToSpacePointMap){
+  for (const art::Ptr<recob::Hit> &hit: hitVect){
+    fHitsView.push_back(hit->View());
+    fHitsPeakTime.push_back(hit->PeakTime());
+    fHitsIntegral.push_back(hit->Integral());
+    fHitsSummedADC.push_back(hit->SummedADC());
+    fHitsChannel.push_back(hit->Channel());
+    fHitsRMS.push_back(hit->RMS());
+    fHitsStartT.push_back(hit->StartTick());
+    fHitsEndT.push_back(hit->EndTick());
+    fHitsWidth.push_back( std::abs(hit->StartTick()-hit->EndTick()) );
+    fHitsChi2.push_back(hit->GoodnessOfFit());
+    fHitsNDF.push_back(hit->DegreesOfFreedom());
+    fHitsClusterID.push_back(clusterId);
+    if(fSaveSpacePoints){
+      if(hitToSpacePointMap.find(hit.key())!=hitToSpacePointMap.end()){
+        fHitsX.push_back(hitToSpacePointMap[hit.key()]->XYZ()[0]);
+        fHitsY.push_back(hitToSpacePointMap[hit.key()]->XYZ()[1]);
+        fHitsZ.push_back(hitToSpacePointMap[hit.key()]->XYZ()[2]);
+      }
+      else{
+        fHitsX.push_back(-999);
+        fHitsY.push_back(-999);
+        fHitsZ.push_back(-999);
+      }
+    }
+    else{
+      fHitsX.push_back(-999);
+      fHitsY.push_back(-999);
+      fHitsZ.push_back(-999);
+    }
+  }
+}
+
+// Fill reco2 function
+void test::TPCAnalyzer::FillReco2(art::Event const& e, std::vector<art::Ptr<recob::PFParticle>> pfpVect, std::map<int, art::Ptr<recob::SpacePoint>> hitToSpacePointMap){
+
+    resetRecoVars();
+    
+    //Read PFPs
+    ::art::Handle<std::vector<recob::PFParticle>> pfpHandle;
+    e.getByLabel(fReco2Label, pfpHandle);
+    //Read Recob Tracks
+    ::art::Handle<std::vector<recob::Track>> trackHandle;
+    e.getByLabel(fTrackLabel, trackHandle);
+    //Read Recob Cluster
+    ::art::Handle<std::vector<recob::Cluster>> clusterHandle;
+    e.getByLabel(fClusterLabel, clusterHandle);
+
+    //Vector for recob hits
+    std::vector<art::Ptr<recob::Hit>> hitVect;
+    //PF to cluster
+    art::FindManyP<recob::Cluster> pfp_cluster_assns (pfpHandle, e, fReco2Label);
+    //PF to track
+    art::FindManyP<recob::Track> pfp_track_assns (pfpHandle, e, fTrackLabel);
+    //Cluster to hit
+    art::FindManyP<recob::Hit> cluster_hit_assns (clusterHandle, e, fReco2Label);
+    //Track to hit
+    art::FindManyP<recob::Hit> track_hit_assns (trackHandle, e, fTrackLabel);
+    //PF to vertex
+    art::FindManyP<recob::Vertex> pfp_vertex_assns(pfpHandle, e, fReco2Label);
+
+    //PFParticle loop -- GetPrimary
+    bool isNeutrino = false;
+    for(const art::Ptr<recob::PFParticle> &pfp : pfpVect){
+
+      std::cout<<"   ** PFParticle: "<<pfp->Self()<<"      PDG:"<<pfp->PdgCode()<<"  Primary="<<pfp->IsPrimary()<<" Mother="<<pfp->Parent()<<std::endl;
+
+      // Save reconstructed neutrino vertex
+      if(  pfp->IsPrimary() && ( !fUseSlices || ( std::abs(pfp->PdgCode())==12 || std::abs(pfp->PdgCode())==14 ) ) ){
+        std::cout<<"    This is a reconstructed netrino!\n";
+        isNeutrino=true;
+        //Get PFParticle Vertex
+        std::vector< art::Ptr<recob::Vertex> > vertexVec = pfp_vertex_assns.at(pfp.key());
+        for(const art::Ptr<recob::Vertex> &ver : vertexVec){
+          geo::Point_t xyz_vertex = ver->position();
+          double chi2=ver->chi2(), chi2ndof=ver->chi2PerNdof();
+          std::cout<<"    --VERTEX  ID="<<ver->ID()<<"  x,y,z="<<xyz_vertex.X()<<","<<xyz_vertex.Y()<<","<<xyz_vertex.Z();
+          std::cout<<" Chi2="<<chi2<<" Chi2/DoF="<<chi2ndof<<" Status:"<<ver->status()<<",\n";
+
+          fRecoVx= xyz_vertex.X();
+          fRecoVy= xyz_vertex.Y();
+          fRecoVz= xyz_vertex.Z();
+
+          std::cout<<"  Reco vertex in FV "<<PointInFV(fRecoVx, fRecoVy, fRecoVz)<<std::endl;
+
+          if(fApplyFiducialCut && PointInFV(fRecoVx, fRecoVy, fRecoVz)){
+            //const double p[3]={fVx, fTrueVy, fTrueVz};
+            std::cout<<"     HasTPC: "<<fGeom->HasTPC(fGeom->FindTPCAtPosition(xyz_vertex))<<" "
+              <<fGeom->FindTPCAtPosition(xyz_vertex).TPC<<std::endl;
+
+            if( fGeom->HasTPC(fGeom->FindTPCAtPosition(xyz_vertex)) ){
+              unsigned int tpcID=fGeom->FindTPCAtPosition(xyz_vertex).TPC;
+
+              fRecoVU=fGeom->NearestChannel(xyz_vertex, geo::PlaneID(0, tpcID, 0));
+              fRecoVV=fGeom->NearestChannel(xyz_vertex, geo::PlaneID(0, tpcID, 1));
+              fRecoVC=fGeom->NearestChannel(xyz_vertex, geo::PlaneID(0, tpcID, 2));
+              fRecoVTimeTick=VertexToDriftTick(fTrueVt, fRecoVx);
+            }
+          }
+          else{
+            fRecoVU=-1;
+            fRecoVV=-1;
+            fRecoVC=-1;
+            fRecoVTimeTick=-1;
+          }
+
+        }
+      }
+
+      //Read cluster and store hits
+      if(fUseSlices){
+        std::vector<art::Ptr<recob::Cluster>> cluster_v = pfp_cluster_assns.at(pfp.key());
+        for(size_t i=0; i<cluster_v.size(); i++){
+          std::vector<art::Ptr<recob::Hit>> hitVect = cluster_hit_assns.at(cluster_v[i].key());
+          std::cout<<"  ClusterID="<<cluster_v[i]->ID()<<" Hits: "<<hitVect.size()<<std::endl;
+          FillHits(pfp->Self(), hitVect, hitToSpacePointMap);
+        }
+      }
+     
+
+
+      //Read the tracks and store the PFParticle start/end points
+      std::vector<art::Ptr<recob::Track>> track_v = pfp_track_assns.at(pfp.key());
+      for(size_t i=0; i<track_v.size(); i++){
+        std::cout<<"     * Track number "<<i<<std::endl;
+        std::cout<<"   "<<track_v[i]->Vertex()<<std::endl;
+        std::cout<<"   "<<track_v[i]->End()<<std::endl;
+        
+        std::vector<double> start {track_v[i]->Vertex().X(), track_v[i]->Vertex().Y(), track_v[i]->Vertex().Z()};
+        std::vector<double> end {track_v[i]->End().X(), track_v[i]->End().Y(), track_v[i]->End().Z()};
+        fPFTrackStart.push_back(start);
+        fPFTrackEnd.push_back(end);
+        fPFPDGCode.push_back(pfp->PdgCode());
+
+        if(!fUseSlices){
+          std::vector<art::Ptr<recob::Hit>> hitVect = track_hit_assns.at(track_v[i].key());
+          std::cout<<"  Hits: "<<hitVect.size()<<std::endl;
+          FillHits(pfp->Self(), hitVect, hitToSpacePointMap);
+        }
+      }
+    }
+
+    // if save reco1, save one slice per entry 
+    // one entry per slice
+    if(isNeutrino || !fUseSlices){
+      fTree->Fill();
+    }
+    
+
+}
 
 // Main function
 void test::TPCAnalyzer::analyze(art::Event const& e)
@@ -361,7 +515,6 @@ void test::TPCAnalyzer::analyze(art::Event const& e)
     // map to store the space points associated to hits
     std::map<int, art::Ptr<recob::SpacePoint>> hitToSpacePointMap;
 
-
     if(fSaveSpacePoints){
       art::Handle<std::vector<recob::SpacePoint>> eventSpacePoints;
       std::vector<art::Ptr<recob::SpacePoint>> eventSpacePointsVect;
@@ -386,162 +539,40 @@ void test::TPCAnalyzer::analyze(art::Event const& e)
     //Read Recob Slice
     ::art::Handle<std::vector<recob::Slice>> sliceHandle;
     e.getByLabel(fReco2Label, sliceHandle);
-    //Read PFPs
-    ::art::Handle<std::vector<recob::PFParticle>> pfpHandle;
-    e.getByLabel(fReco2Label, pfpHandle);
-    //Read Recob Tracks
-    ::art::Handle<std::vector<recob::Track>> trackHandle;
-    e.getByLabel(fReco2Label, trackHandle);
-    //Read Recob Cluster
-    ::art::Handle<std::vector<recob::Cluster>> clusterHandle;
-    e.getByLabel("pandora", clusterHandle);
     
-    // Vectors to store variables
-    //Vector for recob Slices
-    std::vector<art::Ptr<recob::Slice>> sliceVect;
     //Vector for recob PFParticles
     std::vector<art::Ptr<recob::PFParticle>> pfpVect;
-    //Vector for recob hits
-    std::vector<art::Ptr<recob::Hit>> hitVect;
-   
 
-    // Associations
-    //Slice to PFParticles
-    art::FindManyP<recob::PFParticle> slice_pfp_assns (sliceHandle, e, fReco2Label);
-    //PF to cluster
-    art::FindManyP<recob::Cluster> pfp_cluster_assns (pfpHandle, e, fReco2Label);
-    //PF to track
-    art::FindManyP<recob::Track> pfp_track_assns (pfpHandle, e, fTrackLabel);
-    //Cluster to hit
-    art::FindManyP<recob::Hit> cluster_hit_assns (clusterHandle, e, fReco2Label);
-    //PF to vertex
-    art::FindManyP<recob::Vertex> pfp_vertex_assns(pfpHandle, e, fReco2Label);
 
-    // Loop over slices
-    art::fill_ptr_vector(sliceVect, sliceHandle);
-    fNSlices = sliceVect.size();
-    std::cout<<" Number of slices to analyze: "<<fNSlices<<std::endl;
+    if(fUseSlices){
+      //Vector for recob Slices
+      std::vector<art::Ptr<recob::Slice>> sliceVect;
+      //Slice to PFParticles association
+      art::FindManyP<recob::PFParticle> slice_pfp_assns (sliceHandle, e, fReco2Label);
     
-    for(auto & slice:sliceVect){
-
-        resetRecoVars();
-
-        pfpVect = slice_pfp_assns.at(slice.key());
-
-        size_t slice_ix = std::distance(sliceVect.begin(), std::find(sliceVect.begin(), sliceVect.end(), slice));
-        std::cout<<"\n-----Slice index = "<<slice_ix<< " NPFPs="<<pfpVect.size()<<std::endl;
-
-        //PFParticle loop -- GetPrimary
-        bool isNeutrino = false;
-        for(const art::Ptr<recob::PFParticle> &pfp : pfpVect){
-
-          std::cout<<"   ** PFParticle: "<<pfp->Self()<<"      PDG:"<<pfp->PdgCode()<<"  Primary="<<pfp->IsPrimary()<<" Mother="<<pfp->Parent()<<std::endl;
-
-          // Save reconstructed neutrino vertex
-          if(  pfp->IsPrimary() && ( std::abs(pfp->PdgCode())==12 || std::abs(pfp->PdgCode())==14 ) ){
-            std::cout<<"    This is a reconstructed netrino!\n";
-            isNeutrino=true;
-            //Get PFParticle Vertex
-            std::vector< art::Ptr<recob::Vertex> > vertexVec = pfp_vertex_assns.at(pfp.key());
-            for(const art::Ptr<recob::Vertex> &ver : vertexVec){
-              geo::Point_t xyz_vertex = ver->position();
-              double chi2=ver->chi2(), chi2ndof=ver->chi2PerNdof();
-              std::cout<<"    --VERTEX  ID="<<ver->ID()<<"  x,y,z="<<xyz_vertex.X()<<","<<xyz_vertex.Y()<<","<<xyz_vertex.Z();
-              std::cout<<" Chi2="<<chi2<<" Chi2/DoF="<<chi2ndof<<" Status:"<<ver->status()<<",\n";
-
-              fRecoVx= xyz_vertex.X();
-              fRecoVy= xyz_vertex.Y();
-              fRecoVz= xyz_vertex.Z();
-
-              std::cout<<"  Reco vertex in FV "<<PointInFV(fRecoVx, fRecoVy, fRecoVz)<<std::endl;
-
-              if(fApplyFiducialCut && PointInFV(fRecoVx, fRecoVy, fRecoVz)){
-                //const double p[3]={fVx, fTrueVy, fTrueVz};
-                std::cout<<"     HasTPC: "<<fGeom->HasTPC(fGeom->FindTPCAtPosition(xyz_vertex))<<" "
-                  <<fGeom->FindTPCAtPosition(xyz_vertex).TPC<<std::endl;
-
-                if( fGeom->HasTPC(fGeom->FindTPCAtPosition(xyz_vertex)) ){
-                  unsigned int tpcID=fGeom->FindTPCAtPosition(xyz_vertex).TPC;
-
-                  fRecoVU=fGeom->NearestChannel(xyz_vertex, geo::PlaneID(0, tpcID, 0));
-                  fRecoVV=fGeom->NearestChannel(xyz_vertex, geo::PlaneID(0, tpcID, 1));
-                  fRecoVC=fGeom->NearestChannel(xyz_vertex, geo::PlaneID(0, tpcID, 2));
-                  fRecoVTimeTick=VertexToDriftTick(fTrueVt, fRecoVx);
-                }
-              }
-              else{
-                fRecoVU=-1;
-                fRecoVV=-1;
-                fRecoVC=-1;
-                fRecoVTimeTick=-1;
-              }
-
-            }
-          }
-
-          //Read cluster and store hits
-          std::vector<art::Ptr<recob::Cluster>> cluster_v = pfp_cluster_assns.at(pfp.key());
-          for(size_t i=0; i<cluster_v.size(); i++){
-            
-            std::vector<art::Ptr<recob::Hit>> hitVect = cluster_hit_assns.at(cluster_v[i].key());
-            std::cout<<"  ClusterID="<<cluster_v[i]->ID()<<" Hits: "<<hitVect.size()<<std::endl;
-            for (const art::Ptr<recob::Hit> &hit: hitVect){
-              fHitsView.push_back(hit->View());
-              fHitsPeakTime.push_back(hit->PeakTime());
-              fHitsIntegral.push_back(hit->Integral());
-              fHitsSummedADC.push_back(hit->SummedADC());
-              fHitsChannel.push_back(hit->Channel());
-              fHitsRMS.push_back(hit->RMS());
-              fHitsStartT.push_back(hit->StartTick());
-              fHitsEndT.push_back(hit->EndTick());
-              fHitsWidth.push_back( std::abs(hit->StartTick()-hit->EndTick()) );
-              fHitsChi2.push_back(hit->GoodnessOfFit());
-              fHitsNDF.push_back(hit->DegreesOfFreedom());
-              fHitsClusterID.push_back(pfp->Self());
-              std::cout<<"   Hit: "<<hit.key()<<"\n";
-              if(fSaveSpacePoints){
-                if(hitToSpacePointMap.find(hit.key())!=hitToSpacePointMap.end()){
-                  fHitsX.push_back(hitToSpacePointMap[hit.key()]->XYZ()[0]);
-                  fHitsY.push_back(hitToSpacePointMap[hit.key()]->XYZ()[1]);
-                  fHitsZ.push_back(hitToSpacePointMap[hit.key()]->XYZ()[2]);
-                }
-                else{
-                  fHitsX.push_back(-999);
-                  fHitsY.push_back(-999);
-                  fHitsZ.push_back(-999);
-                }
-              }
-              else{
-                fHitsX.push_back(-999);
-                fHitsY.push_back(-999);
-                fHitsZ.push_back(-999);
-              }
-            }
-          }
-
-          //Read the tracks and store the PFParticle start/end points
-          std::vector<art::Ptr<recob::Track>> track_v = pfp_track_assns.at(pfp.key());
-          for(size_t i=0; i<track_v.size(); i++){
-            std::cout<<"     * Track number "<<i<<std::endl;
-            std::cout<<"   "<<track_v[i]->Vertex()<<std::endl;
-            std::cout<<"   "<<track_v[i]->End()<<std::endl;
-            
-            std::vector<double> start {track_v[i]->Vertex().X(), track_v[i]->Vertex().Y(), track_v[i]->Vertex().Z()};
-            std::vector<double> end {track_v[i]->End().X(), track_v[i]->End().Y(), track_v[i]->End().Z()};
-            fPFTrackStart.push_back(start);
-            fPFTrackEnd.push_back(end);
-            fPFPDGCode.push_back(pfp->PdgCode());
-          }
-        }
-
-        // if save reco1, save one slice per entry 
-        // one entry per slice
-        if(isNeutrino){
-          fTree->Fill();
-        }
-        
-
-    }//end slice loop
+      // Loop over slices
+      art::fill_ptr_vector(sliceVect, sliceHandle);
+      fNSlices = sliceVect.size();
+      std::cout<<" Number of slices to analyze: "<<fNSlices<<std::endl;
+    
+      for(auto & slice:sliceVect){
+          // Get the slices PFPs
+          pfpVect = slice_pfp_assns.at(slice.key());
+          size_t slice_ix = std::distance(sliceVect.begin(), std::find(sliceVect.begin(), sliceVect.end(), slice));
+          std::cout<<slice_ix<<"  -- Slice ID="<<slice->ID()<<" NPFPs="<<pfpVect.size()<<std::endl;
+          
+          // Fill reco2
+          FillReco2(e, pfpVect, hitToSpacePointMap);
+      }//end slice loop
+    }
+    else{
+      //Read Recob PFParticles
+      ::art::Handle<std::vector<recob::PFParticle>> pfpHandle;
+      e.getByLabel(fReco2Label, pfpHandle);
+      art::fill_ptr_vector(pfpVect, pfpHandle);
+      std::cout<<" Number of PFParticles to analyze: "<<pfpVect.size()<<std::endl;
+      FillReco2(e, pfpVect, hitToSpacePointMap);
+    }
 
   } //end SaveReco2 block
 

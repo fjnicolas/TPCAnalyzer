@@ -111,6 +111,8 @@ private:
   void resetRecoVars();
   int VertexToDriftTick(double vt, double vx);
   bool PointInFV(double x, double y, double z);
+  void FillReco2(art::Event const& e, std::vector<art::Ptr<recob::PFParticle>> pfpVect, std::map<int, art::Ptr<recob::SpacePoint>> hitToSpacePointMap);
+  void FillHits(int clusterId, std::vector<art::Ptr<recob::Hit>> hitVect, std::map<int, art::Ptr<recob::SpacePoint>> hitToSpacePointMap);
 
   std::string fMCTruthLabel;
   std::string fMCLabel;
@@ -123,6 +125,7 @@ private:
   std::string fHitLabel;
   std::string fReco2Label;
   std::string fTrackLabel;
+  std::string fClusterLabel;
   std::string fSpacePointLabel;
   std::string fVertexLabel;
   bool fSaveReco2;
@@ -137,6 +140,7 @@ private:
   bool fCreateTPCMap;
   bool fApplyFiducialCut;
   bool fApplyVertexSCE;
+  bool fUseSlices;
 
   TTree* fTree;
   int fEventID, fRunID, fSubRunID;
