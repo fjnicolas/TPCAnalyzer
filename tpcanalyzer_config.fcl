@@ -17,14 +17,14 @@ tpcana:
   TrackLabel: "pandoraTrack"
   ClusterLabel: "pandora"
 
-  SaveReco2: false
+  SaveReco2: true
   SaveTruth: true
   SaveSimED: true
   SaveSimEDOut: false
   SaveWaveforms: false
   SaveWires: false
   SaveHits: true
-  SaveSpacePoints: false
+  SaveSpacePoints: true
   SaveVertex: true
   CreateTPCMap: false
   ApplyFiducialCut: true
@@ -33,4 +33,27 @@ tpcana:
   UseSlices: true
 
 }
+
+## TPCAnalyzer configuration for PANDORA reprocessing
+tpcanaPANDORALambda: @local::tpcana
+tpcanaPANDORALambda.HitLabel: "originsAna"
+tpcanaPANDORALambda.SpacePointLabel: "pandoraLambda"
+tpcanaPANDORALambda.VertexLabel: "pandoraLambda"
+tpcanaPANDORALambda.Reco2Label: "pandoraLambda"
+tpcanaPANDORALambda.TrackLabel: "pandoraTrackLambda"
+tpcanaPANDORALambda.ClusterLabel: "pandoraLambda"
+
+## TPCAnalyzer configuration for pmalgtrack
+tpcanaPmalg: @local::tpcana
+tpcanaPmalg.UseSlices: false
+tpcanaPmalg.HitLabel: "originsAna"
+tpcanaPmalg.SpacePointLabel: "pmalgtrackmaker"
+tpcanaPmalg.VertexLabel: "pmalgtrackmaker"
+tpcanaPmalg.Reco2Label: "pmalgtrackmaker"
+tpcanaPmalg.TrackLabel: "pmalgtrackmaker"
+tpcanaPmalg.ClusterLabel: "linecluster"
+
+
 END_PROLOG
+
+

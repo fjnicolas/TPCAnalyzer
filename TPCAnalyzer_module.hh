@@ -108,6 +108,7 @@ private:
   void resetVars();
   void resetTrueVars();
   void resetSimVars();
+  void resetWireVars();
   void resetRecoVars();
   int VertexToDriftTick(double vt, double vx);
   bool PointInFV(double x, double y, double z);
@@ -199,6 +200,7 @@ private:
   std::vector<double> fHitsIntegral;
   std::vector<double> fHitsSummedADC;
   std::vector<double> fHitsChannel;
+  std::vector<double> fHitsAmplitude;
   std::vector<double> fHitsRMS;
   std::vector<double> fHitsStartT;
   std::vector<double> fHitsEndT;
@@ -355,6 +357,7 @@ void test::TPCAnalyzer::beginJob()
     fTree->Branch("HitsSummedADC", &fHitsSummedADC);
     fTree->Branch("HitsPeakTime", &fHitsPeakTime);
     fTree->Branch("HitsChannel", &fHitsChannel);
+    fTree->Branch("HitsAmplitude", &fHitsAmplitude);
     fTree->Branch("HitsRMS", &fHitsRMS);
     fTree->Branch("HitsStartT", &fHitsStartT);
     fTree->Branch("HitsEndT", &fHitsEndT);

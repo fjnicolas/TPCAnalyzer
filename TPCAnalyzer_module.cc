@@ -72,6 +72,7 @@ void test::TPCAnalyzer::FillHits(int clusterId, std::vector<art::Ptr<recob::Hit>
     fHitsIntegral.push_back(hit->Integral());
     fHitsSummedADC.push_back(hit->SummedADC());
     fHitsChannel.push_back(hit->Channel());
+    fHitsAmplitude.push_back(hit->PeakAmplitude());
     fHitsRMS.push_back(hit->RMS());
     fHitsStartT.push_back(hit->StartTick());
     fHitsEndT.push_back(hit->EndTick());
@@ -222,6 +223,7 @@ void test::TPCAnalyzer::analyze(art::Event const& e)
 {
   // Implementation of required member function here.
   auto fSCE = lar::providerFrom<spacecharge::SpaceChargeService>();
+  std::cout<<"\n -------------------------------------- \n";
   std::cout<<"Running TPCAnalyzer---run="<< e.id().run()<<" --subrun="<< e.id().subRun()<<" --event="<<e.id().event()<<"\n";
 
   //............................Event General Info
@@ -332,18 +334,19 @@ void test::TPCAnalyzer::analyze(art::Event const& e)
     bool fFillLambdaTrue = true;
     if(fFillLambdaTrue){
       LambdaTruthManager lambdaMgr(mctruthVect, mcpVect);
-      std::cout<<" LAMBDA PROTON MOMENTUM: "<<lambdaMgr.ProtonMomentumDirection().X()<<" "<<lambdaMgr.ProtonMomentumDirection().Y()<<" "<<lambdaMgr.ProtonMomentumDirection().Z()<<std::endl;
-      fLambdaPionPDir.push_back(lambdaMgr.PionMomentumDirection().X());
-      fLambdaPionPDir.push_back(lambdaMgr.PionMomentumDirection().Y());
-      fLambdaPionPDir.push_back(lambdaMgr.PionMomentumDirection().Z());
-      fLambdaProtonPDir.push_back(lambdaMgr.ProtonMomentumDirection().X());
-      fLambdaProtonPDir.push_back(lambdaMgr.ProtonMomentumDirection().Y());
-      fLambdaProtonPDir.push_back(lambdaMgr.ProtonMomentumDirection().Z());
+      if(lambdaMgr.HasLambdaVDecayed()){
+        fLambdaPionPDir.push_back(lambdaMgr.PionMomentumDirection().X());
+        fLambdaPionPDir.push_back(lambdaMgr.PionMomentumDirection().Y());
+        fLambdaPionPDir.push_back(lambdaMgr.PionMomentumDirection().Z());
+        fLambdaProtonPDir.push_back(lambdaMgr.ProtonMomentumDirection().X());
+        fLambdaProtonPDir.push_back(lambdaMgr.ProtonMomentumDirection().Y());
+        fLambdaProtonPDir.push_back(lambdaMgr.ProtonMomentumDirection().Z());
+      }
     }
-
 
   }
 
+  std::cout<<"  ---- Reading SimEnergyDeposition ----\n";
 
   //............................Read SimEnergyDeposits
   if(fSaveSimED){
@@ -413,10 +416,8 @@ void test::TPCAnalyzer::analyze(art::Event const& e)
     e.getByLabel(fRawDigitLabel, eventRawDigits);
     art::fill_ptr_vector(eventRawDigitsVect, eventRawDigits);
 
-    //size_t NWaveforms=eventRawDigits->size();
-
     for (const art::Ptr<raw::RawDigit> &RD: eventRawDigitsVect){
-      //std::cout<<i<<std::endl;
+
       //Store channel ID and wvf pedestal
       //fRawChannelID[i] = RD->Channel();
       //fRawChannelPedestal[i] = RD->GetPedestal();
@@ -431,6 +432,7 @@ void test::TPCAnalyzer::analyze(art::Event const& e)
 
   //............................Read Wires
   if(fSaveWires){
+    resetWireVars();
     art::Handle<std::vector<recob::Wire>> eventWires;
     std::vector<art::Ptr<recob::Wire>> eventWiresVect;
     std::cout<<" --- Saving Wires\n";
@@ -438,6 +440,7 @@ void test::TPCAnalyzer::analyze(art::Event const& e)
     e.getByLabel(fRecobWireLabel, eventWires);
     art::fill_ptr_vector(eventWiresVect, eventWires);
 
+    std::cout<<"  Number of wires: "<<eventWiresVect.size()<<std::endl;
     for (const art::Ptr<recob::Wire> &W: eventWiresVect){
 
       const recob::Wire::RegionsOfInterest_t&       WireROIVect = W->SignalROI();
@@ -471,6 +474,7 @@ void test::TPCAnalyzer::analyze(art::Event const& e)
         fHitsIntegral.push_back(hit->Integral());
         fHitsSummedADC.push_back(hit->SummedADC());
         fHitsChannel.push_back(hit->Channel());
+        fHitsAmplitude.push_back(hit->PeakAmplitude());
         fHitsRMS.push_back(hit->RMS());
         fHitsStartT.push_back(hit->StartTick());
         fHitsEndT.push_back(hit->EndTick());
@@ -658,17 +662,16 @@ void test::TPCAnalyzer::resetSimVars(){
   }
 }
 
+void test::TPCAnalyzer::resetWireVars()
+{
+  fNROIs=0;
+  fWireID.clear();
+  fWireStampTime.clear();
+  fWireADC.clear();
+}
+
 void test::TPCAnalyzer::resetRecoVars()
 {
-
-  if(fSaveWires){
-    fNROIs=0;
-    fWireID.clear();
-    fWireStampTime.clear();
-    fWireADC.clear();
-    //fWireADC.reserve(fNChannels);
-    //fWireID.reserve(fNChannels);
-  }
 
   if(fSaveHits){
     fHitsView.clear();
@@ -676,6 +679,7 @@ void test::TPCAnalyzer::resetRecoVars()
     fHitsSummedADC.clear();
     fHitsPeakTime.clear();
     fHitsChannel.clear();
+    fHitsAmplitude.clear();
     fHitsRMS.clear();
     fHitsStartT.clear();
     fHitsEndT.clear();
