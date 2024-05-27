@@ -15,6 +15,7 @@ test::TPCAnalyzer::TPCAnalyzer(fhicl::ParameterSet const& p)
   fSimEnergyDepositInstanceLabel( p.get<std::string>("SimEnergyDepositInstanceLabel", "priorSCE") ),
   fSimEnergyDepositLabelOut( p.get<std::string>("SimEnergyDepositLabelOut", "ionandscintout") ),
   fSimEnergyDepositInstanceLabelOut( p.get<std::string>("SimEnergyDepositInstanceLabelOut", "") ),
+  fSimChannelLabel( p.get<std::string>("SimChannelLabel") ),
   fRawDigitLabel( p.get<std::string>("RawDigitLabel", "daq") ),
   fRecobWireLabel( p.get<std::string>("RecobWireLabel", "caldata") ),
   fHitLabel( p.get<std::string>("HitLabel", "gaushit") ),
@@ -36,6 +37,7 @@ test::TPCAnalyzer::TPCAnalyzer(fhicl::ParameterSet const& p)
   fApplyFiducialCut( p.get<bool>("ApplyFiducialCut", "true") ),
   fApplyVertexSCE( p.get<bool>("ApplyVertexSCE", "true") ),
   fUseSlices( p.get<bool>("UseSlices", "true") ),
+  fUseSimChannels( p.get<bool>("UseSimChannels", "false") ),
   fNChannels(fGeom->Nchannels())
   // More initializers here.
 {
@@ -232,6 +234,8 @@ void test::TPCAnalyzer::analyze(art::Event const& e)
   fSubRunID = e.id().subRun();
   fEventID = e.id().event();
 
+  art::ServiceHandle<cheat::ParticleInventoryService> pi_serv;
+
   //Reset tree variables
   resetVars();
 
@@ -346,36 +350,101 @@ void test::TPCAnalyzer::analyze(art::Event const& e)
 
   }
 
-  std::cout<<"  ---- Reading SimEnergyDeposition ----\n";
-
+ 
   //............................Read SimEnergyDeposits
   if(fSaveSimED){
-    art::Handle<std::vector<sim::SimEnergyDeposit> > SimEDHandle;
-    e.getByLabel(fSimEnergyDepositLabel, fSimEnergyDepositInstanceLabel, SimEDHandle);
-    std::cout<<"  ---- Reading SimEnergyDeposition from handle: "<<SimEDHandle.provenance()->moduleLabel();
-    std::cout<<":"<<SimEDHandle.provenance()->productInstanceName()<<" ----\n";
+    
+    std::cout<<"  ---- Reading SimEnergyDeposition ----\n";
 
-    // Fill if valid handle
-    if(SimEDHandle.isValid()){
-      std::cout<<"  ---- SimEnergyDeposition handle is valid ----\n";
+    if(!fUseSimChannels){
 
-      for (auto const& SimED : *SimEDHandle){
-        float y = SimED.MidPointY();
-        float z = SimED.MidPointZ();
-        fEnDepE.push_back(SimED.Energy());
-        fEnDepX.push_back(SimED.MidPointX());
-        fEnDepY.push_back(y);
-        fEnDepZ.push_back(z);
-        fEnDepU.push_back( (z*fCos60-y*fSin60)/fWirePitch );
-        fEnDepV.push_back( (z*fCos60+y*fSin60)/fWirePitch );
-        fEnDepC.push_back( z/fWirePitch );
-        fEnDepT.push_back( (SimED.StartT()+SimED.EndT())/2. );
-        fEnDepPDG.push_back(SimED.PdgCode());
+      art::Handle<std::vector<sim::SimEnergyDeposit> > SimEDHandle;
+      e.getByLabel(fSimEnergyDepositLabel, fSimEnergyDepositInstanceLabel, SimEDHandle);
+      std::cout<<"  ---- Reading SimEnergyDeposition from handle: "<<SimEDHandle.provenance()->moduleLabel();
+      std::cout<<":"<<SimEDHandle.provenance()->productInstanceName()<<" ----\n";
+
+      if(SimEDHandle.isValid()){
+        std::cout<<"  ---- SimEnergyDeposition handle is valid ----\n";
+
+        for (auto const& SimED : *SimEDHandle){
+          float y = SimED.MidPointY();
+          float z = SimED.MidPointZ();
+          fEnDepE.push_back(SimED.Energy());
+          fEnDepX.push_back(SimED.MidPointX());
+          fEnDepY.push_back(y);
+          fEnDepZ.push_back(z);
+          fEnDepU.push_back( (z*fCos60-y*fSin60)/fWirePitch );
+          fEnDepV.push_back( (z*fCos60+y*fSin60)/fWirePitch );
+          fEnDepC.push_back( z/fWirePitch );
+          fEnDepT.push_back( (SimED.StartT()+SimED.EndT())/2. );
+          fEnDepPDG.push_back( SimED.PdgCode() );
+        }
+
+      }
+      else{
+        std::cout<<"  ---- SimEnergyDeposition handle is NOT valid ----\n";
       }
 
     }
     else{
-      std::cout<<"  ---- SimEnergyDeposition handle is NOT valid ----\n";
+
+      // Use SimChannels
+      std::cout<<"  ---- Using SimChannels ---- " << fSimChannelLabel << "\n";
+      std::unordered_map<int, std::vector<sim::IDE>> SimIDEMap;
+      art::Handle< std::vector<sim::SimChannel> > SimChannelHandle;
+      e.getByLabel(fSimChannelLabel, SimChannelHandle);
+      std::cout << "  ---- Reading SimChannels from handle: " << SimChannelHandle.provenance()->moduleLabel();
+
+
+      if(SimChannelHandle.isValid()){
+        
+      
+        for(auto const &sc: *SimChannelHandle){ 
+          
+          // TDC-IDE map: for a given SimChannel, get a map (time tick in TDC, vector of ID)
+          const auto & tdcidemap = sc.TDCIDEMap();
+          
+          // Loop over all of the tdc IDE map objects
+          for(auto mapitr = tdcidemap.begin(); mapitr != tdcidemap.end(); mapitr++){
+            
+            // Second is a vector of IDEs
+            const std::vector<sim::IDE> idevec = (*mapitr).second;
+            
+            // Loop over all of the IDEs in a given simchannel
+            for(size_t iv = 0; iv < idevec.size(); ++iv){
+              
+              if(SimIDEMap.find(idevec[iv].trackID)==SimIDEMap.end()){
+                SimIDEMap[idevec[iv].trackID]=std::vector<sim::IDE>();
+                SimIDEMap[idevec[iv].trackID].push_back(idevec[iv]);
+              }
+              else
+                SimIDEMap[idevec[iv].trackID].push_back(idevec[iv]);
+            }
+          }
+        }
+
+        for(auto &simide: SimIDEMap){
+          for(size_t k=0; k<simide.second.size(); k++){
+            float y = simide.second[k].y;
+            float z = simide.second[k].z;
+            int pdg = pi_serv->TrackIdToParticle_P( std::abs( simide.second[k].trackID ) )->PdgCode();
+            int mcpTime = pi_serv->TrackIdToParticle_P( std::abs( simide.second[k].trackID ) )->T();
+            fEnDepE.push_back(simide.second[k].energy/3);
+            fEnDepX.push_back(simide.second[k].x);
+            fEnDepY.push_back(y);
+            fEnDepZ.push_back(z);
+            fEnDepU.push_back( (z*fCos60-y*fSin60)/fWirePitch );
+            fEnDepV.push_back( (z*fCos60+y*fSin60)/fWirePitch );
+            fEnDepC.push_back( z/fWirePitch );
+            fEnDepT.push_back( mcpTime );
+            fEnDepPDG.push_back( pdg );
+          }
+        }
+      }
+      else{
+        std::cout<<"  ---- SimChannel handle is NOT valid ----\n";
+      }
+
     }
   }
 

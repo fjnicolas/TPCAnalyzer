@@ -8,6 +8,7 @@ tpcana:
   SimEnergyDepositInstanceLabel: "priorSCE"
   SimEnergyDepositLabelOut: "ionandscintout"
   SimEnergyDepositInstanceLabelOut: ""
+  SimChannelLabel: "simtpc2d:simpleSC"
   RecobWireLabel: "caldata"
   RawDigitLabel: "daq"
   HitLabel: "gaushit"
@@ -31,7 +32,7 @@ tpcana:
   ApplyVertexSCE: true
 
   UseSlices: true
-
+  UseSimChannels: false
 }
 
 ## TPCAnalyzer configuration for PANDORA reprocessing

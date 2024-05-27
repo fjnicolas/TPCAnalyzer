@@ -30,6 +30,7 @@
 #include "art/Framework/Services/Registry/ServiceHandle.h"
 
 #include "lardata/DetectorInfoServices/DetectorPropertiesService.h"
+#include "larsim/MCCheater/ParticleInventoryService.h"
 #include "larcore/Geometry/Geometry.h"
 #include "larevt/SpaceCharge/SpaceCharge.h"
 #include "larevt/SpaceChargeServices/SpaceChargeService.h"
@@ -38,6 +39,7 @@
 #include "nusimdata/SimulationBase/MCNeutrino.h"
 #include "nusimdata/SimulationBase/MCParticle.h"
 #include "lardataobj/Simulation/SimEnergyDeposit.h"
+#include "lardataobj/Simulation/SimChannel.h"
 #include "lardataobj/RawData/RawDigit.h"
 #include "lardataobj/RecoBase/Track.h"
 #include "lardataobj/RecoBase/Shower.h"
@@ -121,6 +123,7 @@ private:
   std::string fSimEnergyDepositInstanceLabel;
   std::string fSimEnergyDepositLabelOut;
   std::string fSimEnergyDepositInstanceLabelOut;
+  std::string fSimChannelLabel;
   std::string fRawDigitLabel;
   std::string fRecobWireLabel;
   std::string fHitLabel;
@@ -142,6 +145,7 @@ private:
   bool fApplyFiducialCut;
   bool fApplyVertexSCE;
   bool fUseSlices;
+  bool fUseSimChannels;
 
   TTree* fTree;
   int fEventID, fRunID, fSubRunID;

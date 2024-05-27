@@ -21,6 +21,7 @@ set(
  larcore::Geometry_Geometry_service
  larevt::SpaceCharge
  lardata::DetectorInfoServices_DetectorClocksServiceStandard_service
+ larsim::MCCheater_ParticleInventoryService_service
 
  )
 
