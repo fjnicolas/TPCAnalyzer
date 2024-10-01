@@ -1,0 +1,52 @@
+#include "tpcanalyzer_config.fcl"
+#include "simulationservices_sbnd.fcl"
+#include "hitfindermodules_sbnd.fcl"
+#include "signalservices_sbnd.fcl"
+
+#include "lambdapidana_config.fcl"
+
+process_name: Ana
+
+source:
+{
+module_type:RootInput
+maxEvents: -1
+}
+
+services:
+{
+TFileService: { fileName: "analyzeItOutput_R%r-%R_SR%s-%S.root"}
+@table::sbnd_services
+BackTrackerService: @local::standard_backtrackerservice
+ParticleInventoryService: @local::standard_particleinventoryservice
+#SpaceCharge:               @local::sbnd_spacecharge
+}
+
+physics:
+{
+	analyzers:
+	{
+		ana: @local::tpcana
+		caloAna: @local::LambdaPIDAna
+	}
+	path0: [ana, caloAna]
+	end_paths: [path0]
+}
+
+physics.analyzers.ana.SaveTruth: false
+physics.analyzers.ana.SaveSpacePoints: true
+physics.analyzers.ana.SaveSimED: false
+physics.analyzers.ana.SaveSimEDOut: false
+physics.analyzers.ana.SaveReco2: true
+physics.analyzers.ana.SaveWires: true
+
+physics.analyzers.ana.RecobWireLabel: "sptpc2d:gauss"
+physics.analyzers.ana.CalorimetryLabel: "pandoraCaloData"
+physics.analyzers.ana.ParticleIDLabel: "pandoraPidData"
+
+physics.analyzers.caloAna.LambdaPIDAlgo.MCTruthLabel: ""
+physics.analyzers.caloAna.LambdaPIDAlgo.Reco2Label: "pandora"
+physics.analyzers.caloAna.LambdaPIDAlgo.TrackLabel: "pandoraTrack"
+physics.analyzers.caloAna.LambdaPIDAlgo.CalorimetryLabel: "pandoraCaloData"
+physics.analyzers.caloAna.LambdaPIDAlgo.ParticleIDLabel: "pandoraPidData" 
+physics.analyzers.caloAna.LambdaPIDAlgo.UseBestView: true
