@@ -17,6 +17,8 @@ tpcana:
   Reco2Label: "pandora"
   TrackLabel: "pandoraTrack"
   ClusterLabel: "pandora"
+  CalorimetryLabel: "pandoraCalo"
+  ParticleIDLabel: "pandoraPid"
 
   SaveReco2: true
   SaveTruth: true

@@ -24,6 +24,8 @@ test::TPCAnalyzer::TPCAnalyzer(fhicl::ParameterSet const& p)
   fClusterLabel( p.get<std::string>("ClusterLabel", "pandora") ),
   fSpacePointLabel( p.get<std::string>("SpacePointLabel", "pandora") ),
   fVertexLabel( p.get<std::string>("VertexLabel", "pandora") ),
+  fCalorimetryLabel( p.get<std::string>("CalorimetryLabel", "pandoraCalo") ),
+  fParticleIDLabel( p.get<std::string>("ParticleIDLabel", "pandoraPid") ),
   fSaveReco2( p.get<bool>("SaveReco2", "false") ),
   fSaveTruth( p.get<bool>("SaveTruth", "true") ),
   fSaveSimED( p.get<bool>("SaveSimED", "true") ),
@@ -129,6 +131,10 @@ void test::TPCAnalyzer::FillReco2(art::Event const& e, std::vector<art::Ptr<reco
     art::FindManyP<recob::Hit> track_hit_assns (trackHandle, e, fTrackLabel);
     //PF to vertex
     art::FindManyP<recob::Vertex> pfp_vertex_assns(pfpHandle, e, fReco2Label);
+    // Track to calorimetry
+    art::FindManyP<anab::Calorimetry> track_to_calo_assns(trackHandle, e, fCalorimetryLabel);
+    // Track to PID
+    art::FindManyP<anab::ParticleID> track_to_pid_assns(trackHandle, e, fParticleIDLabel);
 
     //PFParticle loop -- GetPrimary
     bool isNeutrino = false;
@@ -208,6 +214,22 @@ void test::TPCAnalyzer::FillReco2(art::Event const& e, std::vector<art::Ptr<reco
           std::cout<<"  Hits: "<<hitVect.size()<<std::endl;
           FillHits(pfp->Self(), hitVect, hitToSpacePointMap);
         }
+      
+        // --- Get the associated calorimetry and PID objects
+        std::vector<art::Ptr<anab::Calorimetry>> caloV = track_to_calo_assns.at(track_v[i].key());
+        std::vector<art::Ptr<anab::ParticleID>> pidV = track_to_pid_assns.at(track_v[i].key());
+
+        for (size_t j = 0; j < caloV.size(); ++j) {
+          anab::Calorimetry calo = *caloV[j];
+
+          // Collection plane
+          std::cout<<"  Calorimetry object in plane "<<calo.PlaneID().Plane<<std::endl;
+          std::cout<<"  Kinetic Energy: "<<calo.KineticEnergy()<<std::endl;
+          
+        } // end of calorimetry loop
+
+
+
       }
     }
 
@@ -632,7 +654,7 @@ void test::TPCAnalyzer::analyze(art::Event const& e)
           // Get the slices PFPs
           pfpVect = slice_pfp_assns.at(slice.key());
           size_t slice_ix = std::distance(sliceVect.begin(), std::find(sliceVect.begin(), sliceVect.end(), slice));
-          std::cout<<slice_ix<<"  -- Slice ID="<<slice->ID()<<" NPFPs="<<pfpVect.size()<<std::endl;
+          std::cout<<std::endl<<slice_ix<<"  -- Slice ID="<<slice->ID()<<" NPFPs="<<pfpVect.size()<<std::endl;
           
           // Fill reco2
           FillReco2(e, pfpVect, hitToSpacePointMap);

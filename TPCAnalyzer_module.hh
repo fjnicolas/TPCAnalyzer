@@ -51,6 +51,8 @@
 #include "lardataobj/RecoBase/Wire.h"
 #include "lardataobj/RecoBase/Vertex.h"
 #include "lardataobj/RecoBase/Slice.h"
+#include "lardataobj/AnalysisBase/Calorimetry.h"
+#include "lardataobj/AnalysisBase/ParticleID.h"
 
 #include "sbndcode/HyperonAnalyzer/LambdaTruthManager/LambdaTruthManager.hh"
 
@@ -132,6 +134,8 @@ private:
   std::string fClusterLabel;
   std::string fSpacePointLabel;
   std::string fVertexLabel;
+  std::string fCalorimetryLabel;
+  std::string fParticleIDLabel;
   bool fSaveReco2;
   bool fSaveTruth;
   bool fSaveSimED;
