@@ -33,6 +33,7 @@
 #include "larsim/MCCheater/ParticleInventoryService.h"
 #include "larcore/Geometry/Geometry.h"
 #include "larevt/SpaceCharge/SpaceCharge.h"
+#include "larcore/Geometry/WireReadout.h"
 #include "larevt/SpaceChargeServices/SpaceChargeService.h"
 
 #include "nusimdata/SimulationBase/MCTruth.h"
@@ -53,8 +54,6 @@
 #include "lardataobj/RecoBase/Slice.h"
 #include "lardataobj/AnalysisBase/Calorimetry.h"
 #include "lardataobj/AnalysisBase/ParticleID.h"
-
-#include "sbndcode/HyperonAnalyzer/LambdaTruthManager/LambdaTruthManager.hh"
 
 
 #include "TTree.h"
@@ -180,8 +179,6 @@ private:
   int fIntNElectronM;
   int fIntNLambda;
   bool fIntInFV;
-  std::vector<double> fLambdaProtonPDir;
-  std::vector<double> fLambdaPionPDir;
 
   //True SimEnergyDeposits
   std::vector<double> fEnDepE;
@@ -260,6 +257,7 @@ private:
   int fNAnalyzedEvents;
 
   const geo::GeometryCore* fGeom = art::ServiceHandle<geo::Geometry>()->provider();
+  geo::WireReadoutGeom const& wireReadoutAlg = art::ServiceHandle<geo::WireReadout const>()->Get();
 
   unsigned int fNChannels;
   unsigned int fReadoutWindow;
@@ -314,8 +312,6 @@ void test::TPCAnalyzer::beginJob()
     fTree->Branch("IntNElectronM", &fIntNElectronM, "IntNElectronM/I");
     fTree->Branch("IntNLambda", &fIntNLambda, "IntNLambda/I");
     fTree->Branch("IntInFV", &fIntInFV, "IntInFV/O");
-    fTree->Branch("LambdaProtonPDir", &fLambdaProtonPDir);
-    fTree->Branch("LambdaPionPDir", &fLambdaPionPDir);
   }
 
   if(fSaveSimED){
@@ -412,10 +408,10 @@ void test::TPCAnalyzer::endJob(){
     std::ofstream fileoutXYZ("TPCMappingXYZ.txt");
     if(fileout.is_open()){
         double xyz_start[3], xyz_end[3];;
-        for(unsigned int ch=0; ch<fGeom->Nchannels(); ch++){
-          std::vector<geo::WireID> wireV = fGeom->ChannelToWire(ch);
+        for(unsigned int ch=0; ch<wireReadoutAlg.Nchannels(); ch++){
+          std::vector<geo::WireID> wireV = wireReadoutAlg.ChannelToWire(ch);
           for(size_t w=0; w<wireV.size(); w++){
-            fGeom->WireEndPoints(wireV[w], xyz_start, xyz_end);
+            wireReadoutAlg.WireEndPoints(wireV[w], xyz_start, xyz_end);
             fileout<<ch<<" "<<wireV[w].Plane<<" "<<wireV[w].TPC<<std::endl;
             fileoutXYZ<<ch<<" "<<wireV[w].Plane<<" "<<wireV[w].TPC<<" ";
             fileoutXYZ<<xyz_start[0]<<" "<<xyz_start[1]<<" "<<xyz_start[2]<<" ";

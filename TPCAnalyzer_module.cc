@@ -40,7 +40,7 @@ test::TPCAnalyzer::TPCAnalyzer(fhicl::ParameterSet const& p)
   fApplyVertexSCE( p.get<bool>("ApplyVertexSCE", "true") ),
   fUseSlices( p.get<bool>("UseSlices", "true") ),
   fUseSimChannels( p.get<bool>("UseSimChannels", "false") ),
-  fNChannels(fGeom->Nchannels())
+  fNChannels(wireReadoutAlg.Nchannels())
   // More initializers here.
 {
 
@@ -52,7 +52,7 @@ test::TPCAnalyzer::TPCAnalyzer(fhicl::ParameterSet const& p)
   fReadoutWindow = detProp.ReadOutWindowSize();
   fDriftVelocity = detProp.DriftVelocity(); //in cm/us
   constexpr geo::TPCID tpcid{0, 0};
-  fWirePlanePosition = std::abs( fGeom->Plane(geo::PlaneID{tpcid, 1}).GetCenter().X() );
+  fWirePlanePosition = std::abs( wireReadoutAlg.Plane(geo::PlaneID{tpcid, 1}).GetCenter().X() );
 
   fCos60 = std::cos(  60 * (M_PI / 180.0) );
   fSin60 = std::sin(  60 * (M_PI / 180.0) );
@@ -74,7 +74,7 @@ void test::TPCAnalyzer::FillHits(int clusterId, std::vector<art::Ptr<recob::Hit>
     fHitsView.push_back(hit->View());
     fHitsPeakTime.push_back(hit->PeakTime());
     fHitsIntegral.push_back(hit->Integral());
-    fHitsSummedADC.push_back(hit->SummedADC());
+    fHitsSummedADC.push_back(hit->ROISummedADC());
     fHitsChannel.push_back(hit->Channel());
     fHitsAmplitude.push_back(hit->PeakAmplitude());
     fHitsRMS.push_back(hit->RMS());
@@ -168,9 +168,9 @@ void test::TPCAnalyzer::FillReco2(art::Event const& e, std::vector<art::Ptr<reco
             if( fGeom->HasTPC(fGeom->FindTPCAtPosition(xyz_vertex)) ){
               unsigned int tpcID=fGeom->FindTPCAtPosition(xyz_vertex).TPC;
 
-              fRecoVU=fGeom->NearestChannel(xyz_vertex, geo::PlaneID(0, tpcID, 0));
-              fRecoVV=fGeom->NearestChannel(xyz_vertex, geo::PlaneID(0, tpcID, 1));
-              fRecoVC=fGeom->NearestChannel(xyz_vertex, geo::PlaneID(0, tpcID, 2));
+              fRecoVU=wireReadoutAlg.NearestChannel(xyz_vertex, geo::PlaneID(0, tpcID, 0));
+              fRecoVV=wireReadoutAlg.NearestChannel(xyz_vertex, geo::PlaneID(0, tpcID, 1));
+              fRecoVC=wireReadoutAlg.NearestChannel(xyz_vertex, geo::PlaneID(0, tpcID, 2));
               fRecoVTimeTick=VertexToDriftTick(fTrueVt, fRecoVx);
             }
           }
@@ -324,9 +324,9 @@ void test::TPCAnalyzer::analyze(art::Event const& e)
               unsigned int tpcID=fGeom->FindTPCAtPosition(po).TPC;
               geo::PlaneID plane(0, tpcID, 0);
               //fTrueVU=fGeom->NearestChannel(po, 0, tpcID, 0);
-              fTrueVU=fGeom->NearestChannel(po, geo::PlaneID(0, tpcID, 0));
-              fTrueVV=fGeom->NearestChannel(po, geo::PlaneID(0, tpcID, 1));
-              fTrueVC=fGeom->NearestChannel(po, geo::PlaneID(0, tpcID, 2));
+              fTrueVU=wireReadoutAlg.NearestChannel(po, geo::PlaneID(0, tpcID, 0));
+              fTrueVV=wireReadoutAlg.NearestChannel(po, geo::PlaneID(0, tpcID, 1));
+              fTrueVC=wireReadoutAlg.NearestChannel(po, geo::PlaneID(0, tpcID, 2));
               fTrueVTimeTick=VertexToDriftTick(fTrueVt, fTrueVx);
             }
           }
@@ -356,19 +356,6 @@ void test::TPCAnalyzer::analyze(art::Event const& e)
     std::vector<art::Ptr<simb::MCParticle>> mcpVect;
     e.getByLabel(fMCLabel, mcparticleHandle);
     art::fill_ptr_vector(mcpVect, mcparticleHandle);
-
-    bool fFillLambdaTrue = true;
-    if(fFillLambdaTrue){
-      LambdaTruthManager lambdaMgr(mctruthVect, mcpVect);
-      if(lambdaMgr.HasLambdaVDecayed()){
-        fLambdaPionPDir.push_back(lambdaMgr.PionMomentumDirection().X());
-        fLambdaPionPDir.push_back(lambdaMgr.PionMomentumDirection().Y());
-        fLambdaPionPDir.push_back(lambdaMgr.PionMomentumDirection().Z());
-        fLambdaProtonPDir.push_back(lambdaMgr.ProtonMomentumDirection().X());
-        fLambdaProtonPDir.push_back(lambdaMgr.ProtonMomentumDirection().Y());
-        fLambdaProtonPDir.push_back(lambdaMgr.ProtonMomentumDirection().Z());
-      }
-    }
 
   }
 
@@ -563,7 +550,7 @@ void test::TPCAnalyzer::analyze(art::Event const& e)
       for (const art::Ptr<recob::Hit> &hit: hitsVect){
         fHitsPeakTime.push_back(hit->PeakTime());
         fHitsIntegral.push_back(hit->Integral());
-        fHitsSummedADC.push_back(hit->SummedADC());
+        fHitsSummedADC.push_back(hit->ROISummedADC());
         fHitsChannel.push_back(hit->Channel());
         fHitsAmplitude.push_back(hit->PeakAmplitude());
         fHitsRMS.push_back(hit->RMS());
@@ -717,8 +704,6 @@ void test::TPCAnalyzer::resetTrueVars(){
     fIntNElectronM = 0;
     fIntNLambda = 0;
 
-    fLambdaProtonPDir.clear();
-    fLambdaPionPDir.clear();
   }
 
   if(fSaveSimED){
