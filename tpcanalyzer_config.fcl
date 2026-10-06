@@ -19,8 +19,9 @@ tpcana:
   ClusterLabel: "pandora"
   CalorimetryLabel: "pandoraCalo"
   ParticleIDLabel: "pandoraPid"
+  BlipLabel: "blipreco"
+  BlipHitLabel: "specialblipgaushit"
 
-  SaveReco2: true
   SaveTruth: true
   SaveSimED: true
   SaveSimEDOut: false
@@ -29,11 +30,15 @@ tpcana:
   SaveHits: true
   SaveSpacePoints: true
   SaveVertex: true
+  SaveBlips: false
   CreateTPCMap: false
   ApplyFiducialCut: true
   ApplyVertexSCE: true
 
-  UseSlices: true
+  TPCSaveMode: "Reco2Slices" ## Options are Reco1, Reco2, Reco2Slices, Blips
+  NeutrinoOnly: true
+
+
   UseSimChannels: false
 }
 

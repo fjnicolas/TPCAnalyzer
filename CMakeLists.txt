@@ -22,6 +22,7 @@ set(
  larevt::SpaceCharge
  lardata::DetectorInfoServices_DetectorClocksServiceStandard_service
  larsim::MCCheater_ParticleInventoryService_service
+ sbnobj::SBND_Blip
 
  )
 

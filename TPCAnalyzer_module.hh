@@ -55,6 +55,8 @@
 #include "lardataobj/AnalysisBase/Calorimetry.h"
 #include "lardataobj/AnalysisBase/ParticleID.h"
 
+#include "sbnobj/SBND/Blip/BlipDataTypes.h"
+
 
 #include "TTree.h"
 #include "TFile.h"
@@ -113,10 +115,12 @@ private:
   void resetSimVars();
   void resetWireVars();
   void resetRecoVars();
+  void resetBlipVars();
   int VertexToDriftTick(double vt, double vx);
   bool PointInFV(double x, double y, double z);
   void FillReco2(art::Event const& e, std::vector<art::Ptr<recob::PFParticle>> pfpVect, std::map<int, art::Ptr<recob::SpacePoint>> hitToSpacePointMap);
   void FillHits(int clusterId, std::vector<art::Ptr<recob::Hit>> hitVect, std::map<int, art::Ptr<recob::SpacePoint>> hitToSpacePointMap);
+  void FillBlips(art::Event const& e);
 
   std::string fMCTruthLabel;
   std::string fMCLabel;
@@ -135,7 +139,10 @@ private:
   std::string fVertexLabel;
   std::string fCalorimetryLabel;
   std::string fParticleIDLabel;
-  bool fSaveReco2;
+  std::string fBlipLabel;
+  std::string fBlipHitLabel;
+  std::string fTPCSaveMode;
+  bool fNeutrinoOnly;
   bool fSaveTruth;
   bool fSaveSimED;
   bool fSaveSimEDOut;
@@ -144,10 +151,10 @@ private:
   bool fSaveHits;
   bool fSaveSpacePoints;
   bool fSaveVertex;
+  bool fSaveBlips;
   bool fCreateTPCMap;
   bool fApplyFiducialCut;
   bool fApplyVertexSCE;
-  bool fUseSlices;
   bool fUseSimChannels;
 
   TTree* fTree;
@@ -156,6 +163,10 @@ private:
   //True variables
   std::vector<int> fTruePrimariesPDG;
   std::vector<double> fTruePrimariesE;
+  std::vector<double> fTruePrimariesX;
+  std::vector<double> fTruePrimariesY;
+  std::vector<double> fTruePrimariesZ;
+  std::vector<double> fTruePrimariesT;
   std::vector<std::vector<double>> fTruePrimariesStartP;
   double fTrueVx;
   double fTrueVy;
@@ -249,10 +260,23 @@ private:
 
   bool fRecoInFV;
 
-  // Reco track start/end points
+  // Reco track variables
   std::vector<std::vector<double>> fPFTrackStart;
   std::vector<std::vector<double>> fPFTrackEnd;
   std::vector<double> fPFPDGCode;
+  // Calorimetry
+  std::vector<std::vector<float>> fPFPTrackRange;
+  std::vector<std::vector<float>> fPFPTrackdEdx;
+
+  // Blip variables
+  std::vector<double> fBlipX;
+  std::vector<double> fBlipY;
+  std::vector<double> fBlipZ;
+  std::vector<double> fBlipCharge;
+  std::vector<double>  fBlipSize;
+  std::vector<int>    fBlipID;
+  std::vector<int>    fBlipLeadPDG;
+
 
   int fNAnalyzedEvents;
 
@@ -287,6 +311,10 @@ void test::TPCAnalyzer::beginJob()
   fTree->Branch("EventID", &fEventID, "EventID/I");
 
   if(fSaveTruth){
+    fTree->Branch("TruePrimariesX", &fTruePrimariesX);
+    fTree->Branch("TruePrimariesY", &fTruePrimariesY);
+    fTree->Branch("TruePrimariesZ", &fTruePrimariesZ);
+    fTree->Branch("TruePrimariesT", &fTruePrimariesT);
     fTree->Branch("TruePrimariesPDG", &fTruePrimariesPDG);
     fTree->Branch("TruePrimariesE", &fTruePrimariesE);
     fTree->Branch("TruePrimariesStartP", &fTruePrimariesStartP);
@@ -372,7 +400,6 @@ void test::TPCAnalyzer::beginJob()
     fTree->Branch("HitsX", &fHitsX);
     fTree->Branch("HitsY", &fHitsY);
     fTree->Branch("HitsZ", &fHitsZ);
-    
   }
 
   if(fSaveSpacePoints){
@@ -393,11 +420,27 @@ void test::TPCAnalyzer::beginJob()
     fTree->Branch("RecoInFV", &fRecoInFV, "RecoInFV/O");
   }
 
-  if(fSaveReco2){
+  // If includes Reco2
+  if( fTPCSaveMode=="Reco2" || fTPCSaveMode=="Reco2Slices" ){
+    fTree->Branch("NSlices", &fNSlices, "NSlices/I");
     fTree->Branch("PFTrackStart", &fPFTrackStart);
     fTree->Branch("PFTrackEnd", &fPFTrackEnd);
     fTree->Branch("PFPDGCode", &fPFPDGCode);
+    fTree->Branch("PFPTrackRange", &fPFPTrackRange);
+    fTree->Branch("PFPTrackdEdx", &fPFPTrackdEdx);
   }
+
+  //If SaveBlips
+  if(fSaveBlips){
+    fTree->Branch("BlipX", &fBlipX);
+    fTree->Branch("BlipY", &fBlipY);
+    fTree->Branch("BlipZ", &fBlipZ);
+    fTree->Branch("BlipCharge", &fBlipCharge);
+    fTree->Branch("BlipLeadSize", &fBlipSize);
+    fTree->Branch("BlipLeadPDG", &fBlipLeadPDG);
+    fTree->Branch("BlipID", &fBlipID);
+  }
+  
   fNAnalyzedEvents=0;
 }
 

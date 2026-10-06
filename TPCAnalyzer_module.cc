@@ -26,7 +26,10 @@ test::TPCAnalyzer::TPCAnalyzer(fhicl::ParameterSet const& p)
   fVertexLabel( p.get<std::string>("VertexLabel", "pandora") ),
   fCalorimetryLabel( p.get<std::string>("CalorimetryLabel", "pandoraCalo") ),
   fParticleIDLabel( p.get<std::string>("ParticleIDLabel", "pandoraPid") ),
-  fSaveReco2( p.get<bool>("SaveReco2", "false") ),
+  fBlipLabel( p.get<std::string>("BlipLabel") ),
+  fBlipHitLabel( p.get<std::string>("BlipHitLabel") ),
+  fTPCSaveMode( p.get<std::string>("TPCSaveMode") ),
+  fNeutrinoOnly( p.get<bool>("NeutrinoOnly", "true") ),
   fSaveTruth( p.get<bool>("SaveTruth", "true") ),
   fSaveSimED( p.get<bool>("SaveSimED", "true") ),
   fSaveSimEDOut( p.get<bool>("SaveSimEDOut", "false") ),
@@ -35,10 +38,10 @@ test::TPCAnalyzer::TPCAnalyzer(fhicl::ParameterSet const& p)
   fSaveHits( p.get<bool>("SaveHits", "true") ),
   fSaveSpacePoints( p.get<bool>("SaveSpacePoints", "false") ),
   fSaveVertex( p.get<bool>("SaveVertex", "true") ),
+  fSaveBlips( p.get<bool>("SaveBlips", "false") ),
   fCreateTPCMap( p.get<bool>("CreateTPCMap", "false") ),
   fApplyFiducialCut( p.get<bool>("ApplyFiducialCut", "true") ),
   fApplyVertexSCE( p.get<bool>("ApplyVertexSCE", "true") ),
-  fUseSlices( p.get<bool>("UseSlices", "true") ),
   fUseSimChannels( p.get<bool>("UseSimChannels", "false") ),
   fNChannels(wireReadoutAlg.Nchannels())
   // More initializers here.
@@ -108,7 +111,7 @@ void test::TPCAnalyzer::FillHits(int clusterId, std::vector<art::Ptr<recob::Hit>
 void test::TPCAnalyzer::FillReco2(art::Event const& e, std::vector<art::Ptr<recob::PFParticle>> pfpVect, std::map<int, art::Ptr<recob::SpacePoint>> hitToSpacePointMap){
 
     resetRecoVars();
-    
+
     //Read PFPs
     ::art::Handle<std::vector<recob::PFParticle>> pfpHandle;
     e.getByLabel(fReco2Label, pfpHandle);
@@ -136,17 +139,10 @@ void test::TPCAnalyzer::FillReco2(art::Event const& e, std::vector<art::Ptr<reco
     // Track to PID
     art::FindManyP<anab::ParticleID> track_to_pid_assns(trackHandle, e, fParticleIDLabel);
 
-    //PFParticle loop -- GetPrimary
-    bool isNeutrino = false;
+    //PFParticle loop -- figure out if it's a neutrino candidate and save the vertex
     for(const art::Ptr<recob::PFParticle> &pfp : pfpVect){
-
-      std::cout<<"   ** PFParticle: "<<pfp->Self()<<"      PDG:"<<pfp->PdgCode()<<"  Primary="<<pfp->IsPrimary()<<" Mother="<<pfp->Parent()<<std::endl;
-
-      // Save reconstructed neutrino vertex
-      if(  pfp->IsPrimary() && ( !fUseSlices || ( std::abs(pfp->PdgCode())==12 || std::abs(pfp->PdgCode())==14 ) ) ){
-        std::cout<<"    This is a reconstructed netrino!\n";
-        isNeutrino=true;
-        //Get PFParticle Vertex
+      // +++ Save reconstructed neutrino vertex
+      if(  pfp->IsPrimary() && ( std::abs(pfp->PdgCode())==12 || std::abs(pfp->PdgCode())==14 ) ) {
         std::vector< art::Ptr<recob::Vertex> > vertexVec = pfp_vertex_assns.at(pfp.key());
         for(const art::Ptr<recob::Vertex> &ver : vertexVec){
           geo::Point_t xyz_vertex = ver->position();
@@ -183,20 +179,19 @@ void test::TPCAnalyzer::FillReco2(art::Event const& e, std::vector<art::Ptr<reco
 
         }
       }
+    }
 
-      //Read cluster and store hits
-      if(fUseSlices){
-        std::vector<art::Ptr<recob::Cluster>> cluster_v = pfp_cluster_assns.at(pfp.key());
-        for(size_t i=0; i<cluster_v.size(); i++){
-          std::vector<art::Ptr<recob::Hit>> hitVect = cluster_hit_assns.at(cluster_v[i].key());
-          std::cout<<"  ClusterID="<<cluster_v[i]->ID()<<" Hits: "<<hitVect.size()<<std::endl;
-          FillHits(pfp->Self(), hitVect, hitToSpacePointMap);
-        }
+
+    for(const art::Ptr<recob::PFParticle> &pfp : pfpVect){
+      // +++ Read cluster and store hits
+      std::vector<art::Ptr<recob::Cluster>> cluster_v = pfp_cluster_assns.at(pfp.key());
+      for(size_t i=0; i<cluster_v.size(); i++){
+        std::vector<art::Ptr<recob::Hit>> hitVect = cluster_hit_assns.at(cluster_v[i].key());
+        std::cout<<"  ClusterID="<<cluster_v[i]->ID()<<" Hits: "<<hitVect.size()<<std::endl;
+        FillHits(pfp->Self(), hitVect, hitToSpacePointMap);
       }
      
-
-
-      //Read the tracks and store the PFParticle start/end points
+      // +++ Read the tracks and store the PFParticle start/end points, PDG code, and calorimetry
       std::vector<art::Ptr<recob::Track>> track_v = pfp_track_assns.at(pfp.key());
       for(size_t i=0; i<track_v.size(); i++){
         std::cout<<"     * Track number "<<i<<std::endl;
@@ -209,12 +204,10 @@ void test::TPCAnalyzer::FillReco2(art::Event const& e, std::vector<art::Ptr<reco
         fPFTrackEnd.push_back(end);
         fPFPDGCode.push_back(pfp->PdgCode());
 
-        if(!fUseSlices){
-          std::vector<art::Ptr<recob::Hit>> hitVect = track_hit_assns.at(track_v[i].key());
-          std::cout<<"  Hits: "<<hitVect.size()<<std::endl;
-          FillHits(pfp->Self(), hitVect, hitToSpacePointMap);
-        }
-      
+        // Vector to store the calorimetry
+        std::vector<float> caloRange;
+        std::vector<float> calodEdx;
+
         // --- Get the associated calorimetry and PID objects
         std::vector<art::Ptr<anab::Calorimetry>> caloV = track_to_calo_assns.at(track_v[i].key());
         std::vector<art::Ptr<anab::ParticleID>> pidV = track_to_pid_assns.at(track_v[i].key());
@@ -223,24 +216,100 @@ void test::TPCAnalyzer::FillReco2(art::Event const& e, std::vector<art::Ptr<reco
           anab::Calorimetry calo = *caloV[j];
 
           // Collection plane
-          std::cout<<"  Calorimetry object in plane "<<calo.PlaneID().Plane<<std::endl;
-          std::cout<<"  Kinetic Energy: "<<calo.KineticEnergy()<<std::endl;
+          std::cout<<"  [] Calorimetry object in plane "<<calo.PlaneID().Plane<<std::endl;
+          std::cout<<"  [] Kinetic Energy: "<<calo.KineticEnergy()<<std::endl;
+
+          // Save only collection plane calorimetry
+          if (calo.PlaneID().Plane == 2) {
+            for (size_t k = 0; k < calo.dEdx().size(); ++k) {
+              caloRange.push_back(calo.ResidualRange()[k]);
+              calodEdx.push_back(calo.dEdx()[k]);
+            }
+          }
           
         } // end of calorimetry loop
+        fPFPTrackRange.push_back(caloRange);
+        fPFPTrackdEdx.push_back(calodEdx);
 
+      } // end of track loop
 
-
-      }
-    }
-
-    // if save reco1, save one slice per entry 
-    // one entry per slice
-    if(isNeutrino || !fUseSlices){
-      fTree->Fill();
     }
     
+}
+
+
+// Fill blips function
+void test::TPCAnalyzer::FillBlips(art::Event const& e){
+    // How it works
+    // Save all blips with neutrino origin
+    // Save all hits matched to neutrino activity
+    
+    std::cout<<" --- Saving Blips\n";
+    resetBlipVars();
+    
+    // Start by selecting hits
+    art::Handle<std::vector<blip::Blip>> blipHandle;
+    std::vector<art::Ptr<blip::Blip>> blipVect;
+    e.getByLabel(fBlipLabel, blipHandle);
+    art::fill_ptr_vector(blipVect, blipHandle);
+    std::cout<<" Number of Blips to analyze: "<<blipVect.size()<<std::endl;
+
+;
+
+    // Read all hits and store them in a vector
+    art::Handle<std::vector<recob::Hit>> hitsHandle;
+    std::vector<art::Ptr<recob::Hit>> hitsVect;
+    e.getByLabel(fBlipHitLabel, hitsHandle);
+    art::fill_ptr_vector(hitsVect, hitsHandle);
+
+    for (const art::Ptr<blip::Blip> &blip: blipVect){
+      // Get truth blip information
+      // Filter based on G4ID
+      if(fNeutrinoOnly && blip->truth.LeadG4ID > 2.e7) continue;
+
+      // Assing a blip index from blipVect
+      int blipIndex = std::distance(blipVect.begin(), std::find(blipVect.begin(), blipVect.end(), blip));
+
+      fBlipX.push_back(blip->Position.X());
+      fBlipY.push_back(blip->Position.Y());
+      fBlipZ.push_back(blip->Position.Z());
+      fBlipCharge.push_back(blip->Charge);
+      fBlipID.push_back(blipIndex);
+      double blipSize = std::sqrt( std::pow(blip->dX, 2) + std::pow(blip->dYZ, 2));
+      fBlipSize.push_back(blipSize);
+      fBlipLeadPDG.push_back(blip->truth.LeadG4PDG);
+
+      // Get associated hit indices
+      std::vector<unsigned int> hitIndices;
+      // Access hit clusters in std::array<blip::HitClust, kNplanes> clusters;
+      // In hitCluster, access std::set<int>     HitIDs; ///< Index of the recob::Hit objects making up this cluster
+      for (const auto& hitCluster : blip->clusters) {
+        for (const auto& hitID : hitCluster.HitIDs) {
+          hitIndices.push_back(hitID);
+        }
+      }
+      // Get the hits from the indices
+      std::vector<art::Ptr<recob::Hit>> blipHitsVect;
+      for (const auto& hitID : hitIndices) {
+        if (hitID < hitsVect.size()) {
+          blipHitsVect.push_back(hitsVect[hitID]);
+        }
+      }
+
+      
+      // Make it negative with -1000 offset to avoid confusion with cluster IDs
+      blipIndex = -1000 - blipIndex;
+
+
+      // map to store the space points associated to hits (empty by now)
+      std::map<int, art::Ptr<recob::SpacePoint>> hitToSpacePointMap;
+
+      // Fill hits for this blip
+      FillHits(blipIndex, blipHitsVect, hitToSpacePointMap);
+    }
 
 }
+
 
 // Main function
 void test::TPCAnalyzer::analyze(art::Event const& e)
@@ -276,6 +345,10 @@ void test::TPCAnalyzer::analyze(art::Event const& e)
         if( TruePart.StatusCode()==1 ){
           fTruePrimariesPDG.push_back( TruePart.PdgCode() );
           fTruePrimariesE.push_back( TruePart.E() );
+          fTruePrimariesX.push_back( TruePart.Vx() );
+          fTruePrimariesY.push_back( TruePart.Vy() );
+          fTruePrimariesZ.push_back( TruePart.Vz() );
+          fTruePrimariesT.push_back( TruePart.T() );
           if( TruePart.PdgCode()==2212 ) fIntNProtons++;
           if( TruePart.PdgCode()==2112 ) fIntNNeutrons++;
           if( TruePart.PdgCode()==111 ) fIntNPi0++;
@@ -537,8 +610,8 @@ void test::TPCAnalyzer::analyze(art::Event const& e)
   }
 
 
-  //............................Read Hits (Reco1 version)
-  if(fSaveReco2==false){
+  //............................Save TPC (Reco1 version)
+  if(fTPCSaveMode=="Reco1"){
 
     if(fSaveHits){
       art::Handle<std::vector<recob::Hit>> hitsHandle;
@@ -587,13 +660,17 @@ void test::TPCAnalyzer::analyze(art::Event const& e)
 
       }
     }
+
+    if(fSaveBlips) FillBlips(e);
+
+    fTree->Fill();
   }
 
-  //............................Read Hits (Reco2 version)
-  if( fSaveReco2 ){
+  //............................Save TPC (Reco2 version)
+  else if( fTPCSaveMode=="Reco2" || fTPCSaveMode=="Reco2Slices" ){
 
     std::cout<<" --- Saving reco2\n";
-    
+
     // map to store the space points associated to hits
     std::map<int, art::Ptr<recob::SpacePoint>> hitToSpacePointMap;
 
@@ -621,55 +698,70 @@ void test::TPCAnalyzer::analyze(art::Event const& e)
     //Read Recob Slice
     ::art::Handle<std::vector<recob::Slice>> sliceHandle;
     e.getByLabel(fReco2Label, sliceHandle);
-    
+    //Vector for recob Slices
+    std::vector<art::Ptr<recob::Slice>> sliceVect;
     //Vector for recob PFParticles
     std::vector<art::Ptr<recob::PFParticle>> pfpVect;
+    //Slice to PFParticles association
+    art::FindManyP<recob::PFParticle> slice_pfp_assns (sliceHandle, e, fReco2Label);
 
+    art::fill_ptr_vector(sliceVect, sliceHandle);
+    fNSlices = sliceVect.size();
+    std::cout<<" Number of slices to analyze: "<<fNSlices<<std::endl;
 
-    if(fUseSlices){
-      //Vector for recob Slices
-      std::vector<art::Ptr<recob::Slice>> sliceVect;
-      //Slice to PFParticles association
-      art::FindManyP<recob::PFParticle> slice_pfp_assns (sliceHandle, e, fReco2Label);
-    
-      // Loop over slices
-      art::fill_ptr_vector(sliceVect, sliceHandle);
-      fNSlices = sliceVect.size();
-      std::cout<<" Number of slices to analyze: "<<fNSlices<<std::endl;
-    
-      for(auto & slice:sliceVect){
-          // Get the slices PFPs
-          pfpVect = slice_pfp_assns.at(slice.key());
-          size_t slice_ix = std::distance(sliceVect.begin(), std::find(sliceVect.begin(), sliceVect.end(), slice));
-          std::cout<<std::endl<<slice_ix<<"  -- Slice ID="<<slice->ID()<<" NPFPs="<<pfpVect.size()<<std::endl;
-          
-          // Fill reco2
+    // Vector of PFPs
+    std::vector<art::Ptr<recob::PFParticle>> pfpVectToFill;
+    // Loop over slices
+    for(auto & slice:sliceVect){
+        // Get the slices PFPs
+        pfpVect = slice_pfp_assns.at(slice.key());
+        size_t slice_ix = std::distance(sliceVect.begin(), std::find(sliceVect.begin(), sliceVect.end(), slice));
+
+        bool sliceHasNeutrino=false;
+        for(const art::Ptr<recob::PFParticle> &pfp : pfpVect){
+          // +++ Save reconstructed neutrino vertex
+          if(  pfp->IsPrimary() && ( std::abs(pfp->PdgCode())==12 || std::abs(pfp->PdgCode())==14 ) ) {
+            sliceHasNeutrino=true;
+          }
+        }
+        std::cout<<std::endl<<slice_ix<<"  -- Slice ID="<<slice->ID()<<" NPFPs="<<pfpVect.size()<<" HasNeutrino="<<sliceHasNeutrino<<std::endl;
+        
+        // Skip if the slice does not have a neutrino candidate and runnning in NeutrinoSliceOnly mode
+        if( fNeutrinoOnly && !sliceHasNeutrino ){
+          std::cout<<"  -- Skipping slice "<<slice->ID()<<" because it does not have a neutrino candidate\n";
+          continue;
+        }
+
+        // Fill reco2
+        if(fTPCSaveMode=="Reco2Slices"){
           FillReco2(e, pfpVect, hitToSpacePointMap);
-      }//end slice loop
-    }
-    else{
-      //Read Recob PFParticles
-      ::art::Handle<std::vector<recob::PFParticle>> pfpHandle;
-      e.getByLabel(fReco2Label, pfpHandle);
-      art::fill_ptr_vector(pfpVect, pfpHandle);
-      std::cout<<" Number of PFParticles to analyze: "<<pfpVect.size()<<std::endl;
-      FillReco2(e, pfpVect, hitToSpacePointMap);
+          if(fSaveBlips) FillBlips(e);
+          fTree->Fill();
+        }
+        else if(fTPCSaveMode=="Reco2"){
+          pfpVectToFill.insert(pfpVectToFill.end(), pfpVect.begin(), pfpVect.end());
+        }
+
+    }//end slice loop
+
+    if(fTPCSaveMode=="Reco2"){
+      FillReco2(e, pfpVectToFill, hitToSpacePointMap);
+      if(fSaveBlips) FillBlips(e);
+      fTree->Fill();
     }
 
   } //end SaveReco2 block
 
-  // if save reco1, save one event per entry
-  if(fSaveReco2==false){
-    fTree->Fill();
-  }
-  
-}
 
+  else{
+    std::cout<<" --- Unknown TPCSaveMode: "<<fTPCSaveMode<<std::endl;
+  }
+
+}
 
 int test::TPCAnalyzer::VertexToDriftTick(double vt, double vx){
   return int( ( vt/1000 + ( fWirePlanePosition-std::abs(vx) )/fDriftVelocity - fTriggerOffsetTPC)/fTickPeriodTPC );
 }
-
 
 bool test::TPCAnalyzer::PointInFV(double x, double y, double z){
   return ( std::abs(x)>fXFidCut1 && std::abs(x)<fXFidCut2 && std::abs(y)<fYFidCut && z>fZFidCut1 && z<fZFidCut2 );
@@ -680,6 +772,10 @@ void test::TPCAnalyzer::resetTrueVars(){
   if(fSaveTruth){
     fTruePrimariesPDG.clear();
     fTruePrimariesE.clear();
+    fTruePrimariesX.clear();
+    fTruePrimariesY.clear();
+    fTruePrimariesZ.clear();
+    fTruePrimariesT.clear();
     fTruePrimariesStartP.clear();
     fTrueVx=-1e3;
     fTrueVy=-1e3;
@@ -787,16 +883,31 @@ void test::TPCAnalyzer::resetRecoVars()
     fRecoVTimeTick=-1;
   }
 
-  if(fSaveReco2){
+  if( fTPCSaveMode=="Reco2" || fTPCSaveMode=="Reco2Slices" ){
     fPFTrackStart.clear();
     fPFTrackEnd.clear();
     fPFPDGCode.clear();
+    fPFPTrackRange.clear();
+    fPFPTrackdEdx.clear();
   }
+}
+
+void test::TPCAnalyzer::resetBlipVars()
+{
+  fBlipX.clear();
+  fBlipY.clear();
+  fBlipZ.clear();
+  fBlipCharge.clear();
+  fBlipSize.clear();
+  fBlipID.clear();
+  fBlipLeadPDG.clear();
 }
 
 void test::TPCAnalyzer::resetVars()
 {
   resetTrueVars();
   resetSimVars();
+  resetWireVars();
+  resetBlipVars();
   resetRecoVars();
 }
